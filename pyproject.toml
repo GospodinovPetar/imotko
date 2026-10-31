@@ -1,0 +1,15 @@
+[project]
+name = "ai-agent"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "agno[os]>=3.1.12",
+    "beautifulsoup4>=4.15.0",
+    "greenlet>=3.5.6",
+    "openai>=3.42.1",
+    "python-dotenv>=1.2.4",
+    "requests>=2.34.2",
+    "sqlalchemy>=2.1.6",
+]
