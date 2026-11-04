@@ -1,7 +1,6 @@
 """Тестове върху записани HTML файлове: ще гърмят, ако imot.bg смени вида си."""
 
 import functools
-import tempfile
 import time
 import unittest
 from pathlib import Path
@@ -10,8 +9,11 @@ from unittest import mock
 import requests
 from agno.exceptions import ModelProviderError
 
-from imotko import models, notify, search as se, store as st
+from imotko import models, notify
+from imotko import store as st
+from imotko.search import formatting, saved, scan, scoring
 from imotko.sources import imot_bg as sc
+from tests.helpers import TempDatabase
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -103,7 +105,7 @@ class Created(unittest.TestCase):
         self.assertTrue(all(i["created"] for i in listing_items()))
 
     def test_slightly_future_created_is_today(self):
-        self.assertEqual(se.days_since_created({"created": time.time() + 600}), 0)
+        self.assertEqual(scoring.days_since_created({"created": time.time() + 600}), 0)
 
 
 class Slugs(unittest.TestCase):
@@ -129,7 +131,7 @@ class Scoring(unittest.TestCase):
             "year_built": None}
 
     def score(self, listing, priorities=frozenset()):
-        return se.score_listing(listing, 2000, {}, set(priorities))[0]
+        return scoring.score_listing(listing, 2000, {}, set(priorities))[0]
 
     def test_cheaper_scores_higher(self):
         self.assertGreater(self.score(dict(self.base)), self.score(dict(self.base, eur_per_m2=2000)))
@@ -150,15 +152,15 @@ class Scoring(unittest.TestCase):
 
     def test_furnished_filter(self):
         f = {"require_furnished": True}
-        self.assertFalse(se._passes_detail_filters(dict(self.base, furnished=False), f))
-        self.assertTrue(se._passes_detail_filters(dict(self.base, furnished=True), f))
-        self.assertFalse(se._passes_detail_filters(dict(self.base), f))  # страницата не се е заредила
+        self.assertFalse(scan._passes_detail_filters(dict(self.base, furnished=False), f))
+        self.assertTrue(scan._passes_detail_filters(dict(self.base, furnished=True), f))
+        self.assertFalse(scan._passes_detail_filters(dict(self.base), f))  # страницата не се е заредила
 
     def test_order_by_date(self):
         old = dict(self.base, score=90, created=time.time() - 30 * 86400)
         new = dict(self.base, score=10, created=time.time() - 86400)
-        by_date = sorted([old, new], key=se.SORT_ORDERS["date_created"], reverse=True)
-        by_score = sorted([old, new], key=se.SORT_ORDERS["score"], reverse=True)
+        by_date = sorted([old, new], key=scan.SORT_ORDERS["date_created"], reverse=True)
+        by_score = sorted([old, new], key=scan.SORT_ORDERS["score"], reverse=True)
         self.assertIs(by_date[0], new)
         self.assertIs(by_score[0], old)
 
@@ -166,7 +168,7 @@ class Scoring(unittest.TestCase):
         for kwargs in ({"order_by": "price"}, {"priorities": ["басейн"]}, {"construction": "дърво"},
                        {"requre_parking": True}):
             with self.subTest(kwargs), self.assertRaises(ValueError):
-                se.run_search("София", "2", "продажба", 1, 1, **kwargs)
+                scan.run_search("София", "2", "продажба", 1, 1, **kwargs)
 
     def test_recent_listing_gets_bonus(self):
         fresh = dict(self.base, created=time.time() - 86400)
@@ -176,26 +178,17 @@ class Scoring(unittest.TestCase):
     def test_dedupe_keeps_cheapest(self):
         a = dict(self.base, district="Център", id="a")
         b = dict(self.base, district="Център", id="b", price_eur=90000)
-        out = se.remove_duplicates([a, b])
+        out = scan.remove_duplicates([a, b])
         self.assertEqual(len(out), 1)
         self.assertEqual(out[0]["id"], "b")
         self.assertEqual(out[0]["duplicates"], 1)
 
     def test_format_price_per_m2(self):
-        self.assertEqual(se.format_price_per_m2(1461.04, "продажба"), "1461")
-        self.assertEqual(se.format_price_per_m2(7.06, "наем"), "7.1")
+        self.assertEqual(formatting.format_price_per_m2(1461.04, "продажба"), "1461")
+        self.assertEqual(formatting.format_price_per_m2(7.06, "наем"), "7.1")
 
 
-class Store(unittest.TestCase):
-    def setUp(self):
-        self.tmp = tempfile.TemporaryDirectory()
-        patcher = mock.patch.object(st, "DB_PATH", Path(self.tmp.name) / "t.db")
-        patcher.start()
-        self.addCleanup(patcher.stop)
-        self.addCleanup(self.tmp.cleanup)
-        st._create_schema.cache_clear()
-        self.addCleanup(st._create_schema.cache_clear)
-
+class Store(TempDatabase):
     def test_price_change_recorded(self):
         listing = {"id": "x", "url": "u", "title": "t", "location": "l", "price_eur": 100000.0}
         st.record_prices([dict(listing)], "продажба")
@@ -214,12 +207,12 @@ class Store(unittest.TestCase):
 
 class SavedSearch(unittest.TestCase):
     def test_save_as_stores_full_query(self):
-        from imotko import agent as ag
+        from imotko.agent import tools as ag
 
         res = {"results": [{"id": "a"}], "meta": {}}
         with (
-            mock.patch.object(ag.search, "run_search", return_value=res) as run,
-            mock.patch.object(ag.search, "format_results", return_value="ok"),
+            mock.patch.object(ag.scan, "run_search", return_value=res) as run,
+            mock.patch.object(ag.formatting, "format_results", return_value="ok"),
             mock.patch.object(ag.store, "save_search") as save,
             mock.patch.object(ag.store, "mark_seen") as seen,
         ):
@@ -235,7 +228,7 @@ class SavedSearch(unittest.TestCase):
         seen.assert_called_once_with("t", ["a"])
 
     def test_check_saved_survives_errors_and_does_not_mark(self):
-        saved = [{"name": "bad", "params": {"city": "София", "rooms": "2", "deal": "продажба"}, "seen": set()},
+        searches = [{"name": "bad", "params": {"city": "София", "rooms": "2", "deal": "продажба"}, "seen": set()},
                  {"name": "ok", "params": {"city": "Варна", "rooms": "2", "deal": "продажба"}, "seen": {"old"}}]
         good = {"results": [{"id": "old", "score": 50}, {"id": "new", "score": 50}, {"id": "weak", "score": 1}],
                 "meta": {"errors": []}}
@@ -246,26 +239,26 @@ class SavedSearch(unittest.TestCase):
             return good
 
         with (
-            mock.patch.object(se.store, "list_searches", return_value=saved),
-            mock.patch.object(se, "run_search", side_effect=fake_run),
-            mock.patch.object(se, "format_results", return_value="txt"),
-            mock.patch.object(se.store, "mark_seen") as mark,
+            mock.patch.object(st, "list_searches", return_value=searches),
+            mock.patch.object(scan, "run_search", side_effect=fake_run),
+            mock.patch.object(formatting, "format_results", return_value="txt"),
+            mock.patch.object(st, "mark_seen") as mark,
         ):
-            reports = se.check_saved_searches()
+            reports = saved.check_saved_searches()
             mark.assert_not_called()  # нищо не се отбелязва преди доставката
-            se.mark_as_delivered(reports)
+            saved.mark_as_delivered(reports)
         self.assertIn("грешка", reports[0]["text"])
         self.assertEqual(reports[1]["new_ids"], ["new"])  # слабата обява не се отбелязва и може да стане изгодна
         mark.assert_any_call("ok", ["new"])
 
     def test_check_saved_reports_fetch_errors(self):
-        saved = [{"name": "s", "params": {"city": "София", "rooms": "2", "deal": "продажба"}, "seen": set()}]
+        searches = [{"name": "s", "params": {"city": "София", "rooms": "2", "deal": "продажба"}, "seen": set()}]
         blind = {"results": [], "meta": {"errors": ["https://www.imot.bg/...: 429"]}}
         with (
-            mock.patch.object(se.store, "list_searches", return_value=saved),
-            mock.patch.object(se, "run_search", return_value=blind),
+            mock.patch.object(st, "list_searches", return_value=searches),
+            mock.patch.object(scan, "run_search", return_value=blind),
         ):
-            self.assertIn("не отговори", se.check_saved_searches()[0]["text"])
+            self.assertIn("не отговори", saved.check_saved_searches()[0]["text"])
 
 
 class Watch(unittest.TestCase):

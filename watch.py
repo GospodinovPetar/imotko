@@ -8,13 +8,65 @@
 Обявите се отбелязват като видени само след успешна доставка.
 """
 
-from imotko import search
+from imotko import store
+from imotko.geo import shops, transit
 from imotko.notify import default_notifier
+from imotko.quality import checks
+from imotko.search import saved
+
+CHECKS_EVERY_SECONDS = 7 * 86400
+
+
+def refresh_chain_stores() -> None:
+    """Магазините в градовете на запазените търсения, веднъж в месеца. Търсенето само чете от кеша."""
+    cities = set()
+    for saved_search in store.list_searches():
+        city = saved_search["params"].get("city")
+        if city:
+            cities.add(city)
+
+    for city in sorted(cities):
+        if not shops.chains_need_refresh(city):
+            continue
+        if shops.refresh_chains(city):
+            print(f"Магазини в {city}: обновени.")
+        else:
+            print(f"Магазини в {city}: Overpass не отговори, ще опитам пак.")
+
+
+def weekly_tool_checks() -> list[str]:
+    """Проверка на инструментите срещу проверените факти, веднъж седмично. Връща текст само при грешка."""
+    last_run = store.get_place("checks|last_run")
+    if last_run is not None:
+        _, seconds_since_last_run = last_run
+        if seconds_since_last_run < CHECKS_EVERY_SECONDS:
+            return []
+
+    results = checks.run_checks()
+    store.save_place("checks|last_run", {"found": True})
+    report = checks.format_report(results)
+    print(report)
+
+    if all(result["ok"] for result in results):
+        return []
+    return ["Имотко: някои инструменти връщат неверни данни.\n" + report]
+
+
+def run_safely(task, fallback):
+    try:
+        return task()
+    except Exception as error:
+        print(f"{task.__name__}: {type(error).__name__}: {error}")
+        return fallback
 
 
 def main() -> None:
-    reports = search.check_saved_searches()
-    texts = [report["text"] for report in reports]
+    run_safely(refresh_chain_stores, None)
+    run_safely(transit.refresh_feeds, [])
+    check_texts = run_safely(weekly_tool_checks, [])
+    reports = saved.check_saved_searches()
+    report_texts = [report["text"] for report in reports]
+    texts = check_texts + report_texts
 
     print("\n\n".join(texts) or "Няма нови обяви.")
     notifier = default_notifier()
@@ -22,7 +74,7 @@ def main() -> None:
         notifier.notify(texts)
 
     # чак след успешна доставка, иначе при грешка обявите биха се изгубили
-    search.mark_as_delivered(reports)
+    saved.mark_as_delivered(reports)
 
 
 if __name__ == "__main__":
