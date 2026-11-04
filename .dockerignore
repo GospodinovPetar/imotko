@@ -1,0 +1,9 @@
+.venv
+.git
+.env
+.serena
+.ruff_cache
+__pycache__
+*.db*
+data
+tests

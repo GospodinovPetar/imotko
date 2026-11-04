@@ -1,0 +1,28 @@
+name: imotko
+
+services:
+  # Агентът (AgentOS): http://localhost:7777, чат през https://os.agno.com
+  imotko:
+    build: .
+    image: imotko
+    env_file:
+      - path: .env
+        required: false
+    ports:
+      - "7777:7777"
+    volumes:
+      - ./data:/data
+    restart: unless-stopped
+
+  # Проверява запазените търсения на всеки час (известия, ако има NTFY_TOPIC в .env)
+  watch:
+    image: imotko
+    depends_on:
+      - imotko
+    env_file:
+      - path: .env
+        required: false
+    command: ["sh", "-c", "while true; do python watch.py; sleep 3600; done"]
+    volumes:
+      - ./data:/data
+    restart: unless-stopped
