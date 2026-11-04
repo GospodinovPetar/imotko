@@ -9,6 +9,7 @@ dependencies = [
     "beautifulsoup4>=4.15.0",
     "greenlet>=3.5.6",
     "openai>=3.42.1",
+    "pillow>=13.0.0",
     "python-dotenv>=1.2.4",
     "requests>=2.34.2",
     "sqlalchemy>=2.1.6",

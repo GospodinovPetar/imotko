@@ -1,8 +1,10 @@
 """Анализ на снимките на обява с мултимодален модел (хладилник, обзавеждане, състояние)."""
 
+import io
 from concurrent.futures import ThreadPoolExecutor
 
 import requests
+from PIL import Image as PillowImage
 from agno.agent import Agent
 from agno.media import Image
 from agno.run import RunStatus
@@ -13,6 +15,10 @@ from imotko.sources import source
 
 MAX_PHOTOS = 6
 MAX_PHOTO_BYTES = 1_500_000
+# моделът брои снимката по размера ѝ: по-малката струва няколко пъти по-малко токени,
+# а хладилникът и мебелите пак се виждат
+MAX_PHOTO_SIDE = 1024
+PHOTO_QUALITY = 80
 
 INSTRUCTIONS = [
     "Анализираш снимки от обява за апартамент. Отговаряш само на български, на чист език, без чужди думи.",
@@ -23,8 +29,11 @@ INSTRUCTIONS = [
     "Размерът на хладилник преценявай спрямо шкафовете и вратите около него и го отбелязвай като приблизителна оценка.",
 ]
 
+# Моделите с мислене харчат част от лимита за мислене. При 1500 отговорът оставаше празен.
+MAX_ANSWER_TOKENS = 8192
+
 main_model, fallback_models = main_and_fallback_models(
-    VISION_MODEL, VISION_FALLBACK_MODEL, max_tokens=1500, temperature=0.2
+    VISION_MODEL, VISION_FALLBACK_MODEL, max_tokens=MAX_ANSWER_TOKENS, temperature=0.2
 )
 vision_agent = Agent(model=main_model, fallback_models=fallback_models, instructions=INSTRUCTIONS)
 
@@ -38,7 +47,25 @@ def _download_photo(url: str) -> bytes | None:
 
     if len(photo) > MAX_PHOTO_BYTES:
         return None
-    return photo
+    return shrink_photo(photo)
+
+
+def shrink_photo(photo: bytes) -> bytes:
+    """Снимката, смалена до MAX_PHOTO_SIDE пиксела по дългата страна, като JPEG.
+    При грешка (непознат формат) връща оригинала."""
+    try:
+        with PillowImage.open(io.BytesIO(photo)) as image:
+            is_small_jpeg = max(image.size) <= MAX_PHOTO_SIDE and image.format == "JPEG"
+            if is_small_jpeg:
+                return photo
+
+            image = image.convert("RGB")
+            image.thumbnail((MAX_PHOTO_SIDE, MAX_PHOTO_SIDE))
+            smaller = io.BytesIO()
+            image.save(smaller, "JPEG", quality=PHOTO_QUALITY)
+            return smaller.getvalue()
+    except (OSError, ValueError):
+        return photo
 
 
 def analyze_photos(listing_url: str, question: str = "") -> str:
@@ -64,14 +91,19 @@ def analyze_photos(listing_url: str, question: str = "") -> str:
     with ThreadPoolExecutor(len(photo_urls)) as pool:
         photos = list(pool.map(_download_photo, photo_urls))
 
-    images = [Image(content=photo, mime_type="image/jpeg") for photo in photos if photo]
+    downloaded_photos = [photo for photo in photos if photo]
+    images = [Image(content=photo, mime_type="image/jpeg") for photo in downloaded_photos]
     if not images:
         return "Снимките не можаха да се изтеглят."
 
-    prompt = f"Въпрос на потребителя: {question or 'Опиши обзавеждането и състоянието.'}"
-    run = vision_agent.run(prompt, images=images)
+    user_question = question or "Опиши обзавеждането и състоянието."
+    run = vision_agent.run(f"Въпрос на потребителя: {user_question}", images=images)
     answer = (run.content or "").strip()
 
     if run.status == RunStatus.error or not answer:
-        return f"Моделът за зрение е недостъпен в момента ({answer[:120] or 'без отговор'}). Опитай след минута."
+        error_text = answer[:120] or "без отговор"
+        return (
+            f"Моделът за снимки е недостъпен ({error_text}). "
+            "Не опитвай пак в този отговор: кажи на потребителя, че снимките не са проверени."
+        )
     return f"Анализ по {len(images)} снимки на {listing_url}\n\n{answer}"
