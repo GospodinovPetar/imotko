@@ -1,0 +1,26 @@
+{
+  "_описание": "Примерни въпроси към агента и какво трябва да направи. Пускане: uv run python evals/run_agent_evals.py",
+  "cases": [
+    {
+      "question": "Колко е от ул. Елин Връх до УНСС с кола?",
+      "expected_tools": ["distance_between"],
+      "must_mention_any": ["мин"],
+      "minutes_between": [14, 26]
+    },
+    {
+      "question": "Колко е от Младост 1 до летище София с кола?",
+      "expected_tools": ["distance_between"],
+      "must_mention_any": ["квартал"]
+    },
+    {
+      "question": "Кой квартал в Пловдив е най-евтин за двустаен под наем?",
+      "expected_tools": ["compare_districts"],
+      "must_mention_any": ["€/кв.м", "евро"]
+    },
+    {
+      "question": "Търся двустаен под наем в София до 600 евро, с тераса, над 60 кв.м. Покажи ми 3.",
+      "expected_tools": ["search_apartments"],
+      "must_mention_any": ["imot.bg"]
+    }
+  ]
+}
