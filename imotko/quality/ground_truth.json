@@ -1,0 +1,240 @@
+{
+  "_описание": "Проверени факти. Инструментите се сравняват с тях (python -m imotko.quality.checks). Пътуванията калибрират времето с кола в града: реалното време минус времето на OSRM за същите точки. Добавяй ред при всяка забелязана грешка.",
+  "routes": [
+    {
+      "from": "ул. Елин Връх",
+      "to": "Университет за национално и световно стопанство",
+      "city": "София",
+      "from_point": {
+        "lat": 42.6681707,
+        "lon": 23.3151806
+      },
+      "to_point": {
+        "lat": 42.6505806,
+        "lon": 23.3486588
+      },
+      "real_minutes": 20,
+      "real_km": 6,
+      "osrm_minutes": 8.9,
+      "osrm_km": 5.7,
+      "source": "потребителят, вечер със слаб трафик, 4.11.2026",
+      "real_transit_minutes": 34,
+      "transit_source": "Google Maps, градски транспорт, тръгване сряда 11.11.2026 08:00 (най-добрият вариант)"
+    },
+    {
+      "from": "ул. Елин Връх",
+      "to": "Университет за национално и световно стопанство",
+      "city": "София",
+      "from_point": {
+        "lat": 42.6679286,
+        "lon": 23.3163508
+      },
+      "to_point": {
+        "lat": 42.6515789,
+        "lon": 23.3490362
+      },
+      "real_minutes": 16,
+      "real_km": 6.2,
+      "osrm_minutes": 9.7,
+      "osrm_km": 5.9,
+      "source": "Google Maps, сряда 4.11.2026 ~20:05, тръгване веднага"
+    },
+    {
+      "from": "Младост 1",
+      "to": "НДК",
+      "city": "София",
+      "from_point": {
+        "lat": 42.6549083,
+        "lon": 23.3724167
+      },
+      "to_point": {
+        "lat": 42.6851948,
+        "lon": 23.3190206
+      },
+      "real_minutes": 16,
+      "real_km": 6.4,
+      "osrm_minutes": 13.2,
+      "osrm_km": 9.8,
+      "source": "Google Maps, сряда 4.11.2026 ~20:05, тръгване веднага",
+      "real_transit_minutes": 24,
+      "transit_source": "Google Maps, градски транспорт, тръгване сряда 11.11.2026 08:00 (най-добрият вариант)"
+    },
+    {
+      "from": "Люлин 5",
+      "to": "Технически университет",
+      "city": "София",
+      "from_point": {
+        "lat": 42.7141264,
+        "lon": 23.2403835
+      },
+      "to_point": {
+        "lat": 42.6527147,
+        "lon": 23.3547465
+      },
+      "real_minutes": 31,
+      "real_km": 15.0,
+      "osrm_minutes": 21.9,
+      "osrm_km": 15.3,
+      "source": "Google Maps, сряда 4.11.2026 ~20:05, тръгване веднага",
+      "real_transit_minutes": 51,
+      "transit_source": "Google Maps, градски транспорт, тръгване сряда 11.11.2026 08:00 (най-добрият вариант)"
+    },
+    {
+      "from": "Борово",
+      "to": "SAP Labs Bulgaria",
+      "city": "София",
+      "from_point": {
+        "lat": 42.6696053,
+        "lon": 23.2877825
+      },
+      "to_point": {
+        "lat": 42.6598587,
+        "lon": 23.3210517
+      },
+      "real_minutes": 13,
+      "real_km": 4.2,
+      "osrm_minutes": 6.7,
+      "osrm_km": 4.2,
+      "source": "Google Maps, сряда 4.11.2026 ~20:05, тръгване веднага",
+      "real_transit_minutes": 27,
+      "transit_source": "Google Maps, градски транспорт, тръгване сряда 11.11.2026 08:00 (най-добрият вариант)"
+    },
+    {
+      "from": "Красно село",
+      "to": "Бизнес парк София",
+      "city": "София",
+      "from_point": {
+        "lat": 42.6751492,
+        "lon": 23.2841842
+      },
+      "to_point": {
+        "lat": 42.6254365,
+        "lon": 23.3782414
+      },
+      "real_minutes": 18,
+      "real_km": 13.6,
+      "osrm_minutes": 16.1,
+      "osrm_km": 14.1,
+      "source": "Google Maps, сряда 4.11.2026 ~20:05, тръгване веднага",
+      "real_transit_minutes": 36,
+      "transit_source": "Google Maps, градски транспорт, тръгване сряда 11.11.2026 08:00 (най-добрият вариант)"
+    },
+    {
+      "from": "Надежда 4",
+      "to": "Летище София",
+      "city": "София",
+      "from_point": {
+        "lat": 42.7349613,
+        "lon": 23.2982027
+      },
+      "to_point": {
+        "lat": 42.6932748,
+        "lon": 23.4078584
+      },
+      "real_minutes": 24,
+      "real_km": 12.9,
+      "osrm_minutes": 22.2,
+      "osrm_km": 16.8,
+      "source": "Google Maps, сряда 4.11.2026 ~20:05, тръгване веднага",
+      "real_transit_minutes": 65,
+      "transit_source": "Google Maps, градски транспорт, тръгване сряда 11.11.2026 08:00 (най-добрият вариант)"
+    },
+    {
+      "from": "Лозенец",
+      "to": "бул. Цар Борис III 81",
+      "city": "София",
+      "from_point": {
+        "lat": 42.676266,
+        "lon": 23.3218551
+      },
+      "to_point": {
+        "lat": 42.6802461,
+        "lon": 23.2883659
+      },
+      "real_minutes": 13,
+      "real_km": 4.8,
+      "osrm_minutes": 6.6,
+      "osrm_km": 4.2,
+      "source": "Google Maps, сряда 4.11.2026 ~20:05, тръгване веднага",
+      "real_transit_minutes": 28,
+      "transit_source": "Google Maps, градски транспорт, тръгване сряда 11.11.2026 08:00 (най-добрият вариант)"
+    },
+    {
+      "from": "Овча купел 1",
+      "to": "Университет за национално и световно стопанство",
+      "city": "София",
+      "from_point": {
+        "lat": 42.6845067,
+        "lon": 23.2617291
+      },
+      "to_point": {
+        "lat": 42.6515789,
+        "lon": 23.3490362
+      },
+      "real_minutes": 26,
+      "real_km": 13.4,
+      "osrm_minutes": 16.1,
+      "osrm_km": 10.5,
+      "source": "Google Maps, сряда 4.11.2026 ~20:05, тръгване веднага",
+      "real_transit_minutes": 47,
+      "transit_source": "Google Maps, градски транспорт, тръгване сряда 11.11.2026 08:00 (най-добрият вариант)"
+    }
+  ],
+  "districts": [
+    {
+      "name": "Младост 1",
+      "city": "София",
+      "expect_area": true,
+      "name_contains": "Младост 1"
+    },
+    {
+      "name": "Лозенец",
+      "city": "София",
+      "expect_area": true,
+      "name_contains": "Лозенец"
+    },
+    {
+      "name": "Аспарухово",
+      "city": "Варна",
+      "expect_area": true,
+      "name_contains": "Варна"
+    }
+  ],
+  "streets": [
+    {
+      "street": "ул. Враня",
+      "district": "Банишора",
+      "city": "София",
+      "name_contains": "Банишора"
+    }
+  ],
+  "places": [
+    {
+      "name": "УНСС",
+      "city": "София",
+      "name_contains": "Университет за национално и световно стопанство"
+    },
+    {
+      "name": "Летище София",
+      "city": "София",
+      "name_contains": "Летище"
+    },
+    {
+      "name": "SAP Labs Bulgaria",
+      "city": "София",
+      "name_contains": "Сребърна"
+    }
+  ],
+  "addresses": [
+    {
+      "address": "бул. Цар Борис III 81",
+      "city": "София",
+      "name_contains": "Хиподрума"
+    },
+    {
+      "address": "SAP Labs Bulgaria, бул. Цариградско шосе 136А",
+      "city": "София",
+      "name_contains": "Сребърна"
+    }
+  ]
+}
