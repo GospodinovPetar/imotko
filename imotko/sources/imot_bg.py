@@ -20,9 +20,9 @@ from imotko.sources.base import ListingSource
 BASE_URL = "https://www.imot.bg"
 BGN_PER_EUR = 1.95583
 
-CACHE_SECONDS = 600 # колко време пазим свалена страница
-CACHE_MAX_PAGES = 200 # над толкова страници чистим изтеклите
-MAX_PARALLEL_REQUESTS = 4 # не натоварваме сайта
+CACHE_SECONDS = 600
+CACHE_MAX_PAGES = 200
+MAX_PARALLEL_REQUESTS = 4
 
 # Дума от потребителя -> част от адреса в imot.bg
 DEALS = {
@@ -244,6 +244,42 @@ def parse_listing_floor(info: str) -> tuple[int | None, int | None]:
 
 # Списък с обяви
 
+def _text_of(parent, selector: str, separator: str = " ") -> str:
+    element = parent.select_one(selector)
+    if element is None:
+        return ""
+    return element.get_text(separator, strip=True)
+
+
+def _area_from_info(info: str) -> float | None:
+    area_match = re.search(r"(\d+(?:[.,]\d+)?)\s*кв\.?\s*м", info)
+    if area_match is None:
+        return None
+    return float(area_match.group(1).replace(",", "."))
+
+
+def _year_from_info(info: str) -> int | None:
+    year_match = re.search(r"(?:експлоатация|строителство)\s*(\d{4})", info)
+    if year_match is None:
+        return None
+    return int(year_match.group(1))
+
+
+def _street_from_info(info: str) -> str | None:
+    # "64 кв.м, ул. Ген. Никола Жеков, 2-ри ет. от 4": улицата е веднага след квадратурата, ако я има
+    street_match = re.match(r"[\d.,]+\s*кв\.?\s*м,\s*((?:ул|бул)\.\s*[^,]{2,40})", info)
+    if street_match is None:
+        return None
+    return street_match.group(1).strip()
+
+
+def _district_from_location(location: str) -> str:
+    # "град София, Лозенец" -> квартал "Лозенец"
+    if "," in location:
+        return location.split(",", 1)[1].strip()
+    return location
+
+
 def parse_listing(item) -> dict | None:
     """Данните за една обява от списъка. None, ако обявата няма цена."""
     title_link = item.select_one("a.title")
@@ -255,24 +291,12 @@ def parse_listing(item) -> dict | None:
     if price is None:
         return None
 
-    info_element = item.select_one("div.info")
-    info = info_element.get_text(" ", strip=True) if info_element else ""
-
-    area_match = re.search(r"(\d+(?:[.,]\d+)?)\s*кв\.?\s*м", info)
-    area = float(area_match.group(1).replace(",", ".")) if area_match else None
-
-    year_match = re.search(r"(?:експлоатация|строителство)\s*(\d{4})", info)
-    year_built = int(year_match.group(1)) if year_match else None
-
+    info = _text_of(item, "div.info")
+    area = _area_from_info(info)
     floor, floors_total = parse_listing_floor(info)
 
-    # "град София, Лозенец" -> квартал "Лозенец"
     location_element = title_link.find("location")
     location = location_element.get_text(strip=True) if location_element else ""
-    if "," in location:
-        district = location.split(",", 1)[1].strip()
-    else:
-        district = location
 
     url = urljoin(BASE_URL, title_link["href"])
     ad_id = listing_id(url)
@@ -282,13 +306,14 @@ def parse_listing(item) -> dict | None:
         "created": created_timestamp(ad_id) if ad_id else None,
         "title": title_link.contents[0].strip() if title_link.contents else "",
         "location": location,
-        "district": district,
+        "district": _district_from_location(location),
+        "street": _street_from_info(info),
         "price_eur": float(price),
         "area_m2": area,
         "eur_per_m2": round(price / area, 1) if area else None,
         "floor": floor,
         "floors_total": floors_total,
-        "year_built": year_built,
+        "year_built": _year_from_info(info),
         "info": info[:300],
         "url": url,
     }
@@ -342,7 +367,8 @@ def is_mentioned(text: str, pattern: str) -> bool:
     "има асансьор" -> да; "без асансьор", "няма гараж", "не е обзаведен" -> не.
     """
     for match in re.finditer(pattern, text):
-        words_before = text[max(0, match.start() - 25):match.start()]
+        before_start = max(0, match.start() - 25)
+        words_before = text[before_start:match.start()]
         is_negated = re.search(r"(?<!\w)(?:без|няма|не)\s+(?:\S+\s+)?$", words_before)
         if not is_negated:
             return True
@@ -378,35 +404,44 @@ def parse_detail(html: str) -> dict:
     """Данните от страницата на обявата. Неразпознатите полета са None."""
     page = BeautifulSoup(html, "html.parser")
 
-    params_element = page.select_one("div.adParams")
-    params = params_element.get_text(" ", strip=True) if params_element else ""
-
+    params = _text_of(page, "div.adParams")
     # "Особености" са подредени белези; описанието е свободен текст
-    features = ", ".join(item.get_text(strip=True) for item in page.select("div.carExtri div.items div"))
-    description_element = page.select_one("div.moreInfo div.text")
-    description = description_element.get_text(" ", strip=True) if description_element else ""
+    feature_items = [item.get_text(strip=True) for item in page.select("div.carExtri div.items div")]
+    features = ", ".join(feature_items)
+    description = _text_of(page, "div.moreInfo div.text")
 
     all_text = f"{params} {features} {description}".lower()
 
-    floor_match = re.search(r"етаж:\s*(\d+|партер|сутерен)\D*?от\s*(\d+)", params, re.IGNORECASE)
+    floor, floors_total = _detail_floor(params)
     construction_match = re.search(r"\b(" + "|".join(CONSTRUCTION_TYPES) + r")\b", all_text)
     year_match = re.search(r"експлоатация\s*(\d{4})", params)
 
-    not_finished_yet = re.search(r"ще бъде въведен|не е въведен", params, re.IGNORECASE)
-    construction_words = re.search(r"в строеж|новостро[ия]щ|акт 14|акт 15", all_text)
-
     return {
-        "floor": _floor_number(floor_match.group(1)) if floor_match else None,
-        "floors_total": int(floor_match.group(2)) if floor_match else None,
+        "floor": floor,
+        "floors_total": floors_total,
         "construction": construction_match.group(1) if construction_match else None,
         "year_built": int(year_match.group(1)) if year_match else None,
-        "in_construction": bool(not_finished_yet or construction_words),
+        "in_construction": _is_in_construction(params, all_text),
         "has_act16": is_mentioned(all_text, r"акт 16"),
         "has_elevator": is_mentioned(all_text, r"асансьор"),
         "has_parking": is_mentioned(all_text, r"паркинг|гараж|паркомясто"),
         "furnished": is_mentioned(all_text, r"\bобзаведен|с обзавеждане"),
+        "has_terrace": is_mentioned(all_text, r"тераса|(?<!френски )балкон"),
         "photos": listing_photos(html),
     }
+
+
+def _detail_floor(params: str) -> tuple[int | None, int | None]:
+    floor_match = re.search(r"етаж:\s*(\d+|партер|сутерен)\D*?от\s*(\d+)", params, re.IGNORECASE)
+    if floor_match is None:
+        return None, None
+    return _floor_number(floor_match.group(1)), int(floor_match.group(2))
+
+
+def _is_in_construction(params: str, all_text: str) -> bool:
+    not_finished_yet = re.search(r"ще бъде въведен|не е въведен", params, re.IGNORECASE)
+    construction_words = re.search(r"в строеж|новостро[ия]щ|акт 14|акт 15", all_text)
+    return bool(not_finished_yet or construction_words)
 
 
 def add_details(listings) -> None:
