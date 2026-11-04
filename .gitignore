@@ -14,3 +14,6 @@ wheels/
 imot_history.db
 imot.db*
 data/
+
+# разписания на градския транспорт (свалят се в DATA_DIR)
+gtfs/
