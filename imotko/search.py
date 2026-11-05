@@ -1,6 +1,6 @@
 """Търсене: филтриране, премахване на повторения, оценка и текст за отговора.
 
-Модулът не знае нищо за агента. Обявите са речници, които връща imot_scraper.
+Модулът не знае нищо за агента. Обявите са речници, които връща imotko.sources.
 """
 
 import os
@@ -10,8 +10,8 @@ from dataclasses import dataclass
 from itertools import batched
 from urllib.parse import quote_plus
 
-import imot_scraper as scraper
-import imot_store as store
+from imotko import store
+from imotko.sources import source
 
 MIN_LISTINGS_FOR_DISTRICT_MEDIAN = 5
 MAX_DETAIL_CHECKS = 25  # толкова обяви най-много проверяваме в детайли (по една заявка на обява)
@@ -68,8 +68,8 @@ def _validate_filters(filters: dict) -> None:
         raise ValueError(f"Непознат филтър: {', '.join(sorted(unknown))}.")
 
     construction = filters.get("construction")
-    if construction and construction.lower() not in scraper.CONSTRUCTION_TYPES:
-        raise ValueError(f"Строителство трябва да е едно от: {', '.join(scraper.CONSTRUCTION_TYPES)}.")
+    if construction and construction.lower() not in source.construction_types:
+        raise ValueError(f"Строителство трябва да е едно от: {', '.join(source.construction_types)}.")
 
 
 # Подредба
@@ -297,7 +297,7 @@ def _scan_market(city: str, rooms: str, deal: str, pages: int):
 
     Връща (обяви, грешки при свалянето, медиана за града, медиани по квартали).
     """
-    listings, errors = scraper.fetch_listings(deal, city, rooms, pages)
+    listings, errors = source.fetch_listings(deal, city, rooms, pages)
     store.record_prices(listings, deal)
     city_median, district_medians = median_prices(listings)
     return listings, errors, city_median, district_medians
@@ -373,12 +373,12 @@ def _check_details(candidates: list[dict], filters: dict, top: int, order_by: st
     if order_by == "score":
         group_size = max(len(to_check), 1)
     else:
-        group_size = scraper.MAX_PARALLEL_REQUESTS
+        group_size = source.max_parallel_requests
 
     matching = []
     checked = 0
     for group in batched(to_check, group_size):
-        scraper.add_details(group)
+        source.add_details(group)
         checked += len(group)
 
         for listing in group:
@@ -444,7 +444,7 @@ def _days_text(days: int) -> str:
 
 def format_price_per_m2(value: float, deal: str) -> str:
     """При наем цената на кв.м е няколко евро и има нужда от знак след запетаята."""
-    is_rent = scraper.DEALS.get(deal.strip().lower()) == "naemi"
+    is_rent = source.is_rent(deal)
     return f"{value:.1f}" if is_rent else f"{value:.0f}"
 
 
@@ -454,7 +454,7 @@ def _floor_text(listing: dict) -> str:
     if floor is None or not floors_total:
         return "?"
 
-    floor_names = {number: name for name, number in scraper.NAMED_FLOORS.items()}
+    floor_names = {number: name for name, number in source.named_floors.items()}
     return f"{floor_names.get(floor, floor)}/{floors_total}"
 
 

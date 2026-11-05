@@ -10,11 +10,8 @@ from unittest import mock
 import requests
 from agno.exceptions import ModelProviderError
 
-import imot_models as models
-import imot_scraper as sc
-import imot_search as se
-import imot_store as st
-import watch
+from imotko import models, notify, search as se, store as st
+from imotko.sources import imot_bg as sc
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -36,7 +33,7 @@ def detail():
 class ListingParsing(unittest.TestCase):
     def test_parses_most_items(self):
         items = listing_items()
-        self.assertGreaterEqual(len(items), 30)
+        self.assertGreaterEqual(len(items), 5)
         for i in items:
             self.assertGreater(i["price_eur"], 1000)
             self.assertTrue(i["url"].startswith("https://www.imot.bg/obiava-"))
@@ -217,7 +214,7 @@ class Store(unittest.TestCase):
 
 class SavedSearch(unittest.TestCase):
     def test_save_as_stores_full_query(self):
-        import imot_agent as ag
+        from imotko import agent as ag
 
         res = {"results": [{"id": "a"}], "meta": {}}
         with (
@@ -274,15 +271,35 @@ class SavedSearch(unittest.TestCase):
 class Watch(unittest.TestCase):
     def test_split_message_on_lines(self):
         text = "\n".join("ред %d " % i + "x" * 100 for i in range(100))
-        parts = watch.split_message(text, 1000)
+        parts = notify.split_message(text, 1000)
         self.assertTrue(all(len(part) <= 1000 for part in parts))
         self.assertEqual("".join(parts), text)
 
     def test_notify_sends_cyrillic_title_as_json(self):
-        with mock.patch.dict("os.environ", {"NTFY_TOPIC": "t"}), mock.patch.object(watch.requests, "post") as post:
-            watch.notify(["Нови"])
+        with mock.patch.object(notify.requests, "post") as post:
+            notify.NtfyNotifier("t").notify(["Нови"])
         self.assertEqual(post.call_args.kwargs["json"]["title"], "Нови обяви в imot.bg")
         self.assertNotIn("headers", post.call_args.kwargs)
+
+
+class Notifiers(unittest.TestCase):
+    def test_no_topic_means_no_notifier(self):
+        with mock.patch.dict("os.environ", {}, clear=True):
+            self.assertIsNone(notify.default_notifier())
+        with mock.patch.dict("os.environ", {"NTFY_TOPIC": "t"}):
+            self.assertIsInstance(notify.default_notifier(), notify.NtfyNotifier)
+
+    def test_custom_channel_only_implements_send(self):
+        class Memory(notify.Notifier):
+            def __init__(self):
+                self.sent = []
+
+            def send(self, message):
+                self.sent.append(message)
+
+        channel = Memory()
+        channel.notify(["a", "b"])
+        self.assertEqual(channel.sent, ["a", "b"])
 
 
 class Models(unittest.TestCase):

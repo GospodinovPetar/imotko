@@ -1,76 +1,78 @@
-# 🏠 Имотко - агентът, който рови в imot.bg вместо теб
+# 🏠 Imotko - the agent that digs through imot.bg for you
 
-Знаеш го онова чувство: 47 отворени таба, всеки апартамент "с невероятна гледка" (към съседния блок), а цените се сравняват трудно. 😅
+You know the feeling: 47 open tabs, every apartment "with an amazing view" (of the neighbouring building), and prices that are hard to compare. 😅
 
-**Имотко** е AI брокер с "10 години опит", който върши мъчителната част. Казваш му на нормален български какво търсиш, а той:
+**Imotko** is an AI broker with "10 years of experience" that does the tedious part. You tell it in plain Bulgarian what you are looking for, and it:
 
-- 🔎 обхожда imot.bg (до ~320 обяви наведнъж),
-- 📊 сравнява цената на кв.м с тази в квартала и дава **оценка** на всяка обява,
-- 📸 **гледа снимките** вместо теб ("Какъв е хладилникът? Има ли влага по тавана?"),
-- 🔔 **следи** търсенето ти и те подсеща, когато излезе нещо ново и изгодно,
+- 🔎 crawls imot.bg (up to ~320 listings at a time),
+- 📊 compares the price per sq.m with the neighbourhood average and gives every listing a **score**,
+- 📸 **looks at the photos** for you ("What kind of fridge is that? Is there damp on the ceiling?"),
+- 🔔 **watches** your search and pings you when something new and good shows up.
 
-И най-важното: **не измисля обяви**. Показва само това, което е намерил, с линкове.
+And most importantly: it **does not make up listings**. It only shows what it found, with links.
 
 ---
 
-## 💬 Как се говори с него
+## 💬 How to talk to it
 
-Просто пиши:
+Just write:
 
 > "Търся тристаен в София до 200 000 евро, без последен етаж, задължително асансьор."
 
 > "Кой квартал в Пловдив е най-евтин за двустаен?"
 
-> "Виж снимките на тази обява - какъв е хладилникът? [линк]"
+> "Виж снимките на тази обява - какъв е хладилникът? [link]"
 
-> "Следи ми двустайни под наем в Варна до 600 евро и ме уведомявай."
+> "Следи ми двустайни под наем във Варна до 600 евро и ме уведомявай."
 
-Ако пропуснеш град или брой стаи, ще ти ги поиска. За нищо друго няма да те разпитва.
+(The agent understands Bulgarian: the examples above are "A three-room apartment in Sofia up to 200,000 euro, not on the top floor, elevator required", "Which neighbourhood in Plovdiv is cheapest for a two-room?", "Look at the photos of this listing - what kind of fridge is it?" and "Watch two-room rentals in Varna up to 600 euro and notify me.")
 
-### Какво разбира
+If you leave out the city or the number of rooms, it will ask. It won't quiz you about anything else.
 
-| Казваш                                                                       | Той прави                                           |
-| ---------------------------------------------------------------------------- | --------------------------------------------------- |
-| "без първи/последен етаж"                                                    | отрязва ги от резултатите                           |
-| "задължително асансьор / паркинг"                                            | оставя само обявите с тях                           |
-| "важно ми е…" (асансьор, паркинг, тухла, ново, акт 16, обзаведен, намаление) | дава им по-голяма тежест в оценката                 |
-| "само тухла / панел / ЕПК"                                                   | филтрира по строителство                            |
-| "най-изгодните първо"                                                        | сортира по оценка (иначе са най-новите първо)       |
-| "следи ми" / "уведоми ме"                                                    | запазва търсенето и после показва само новите обяви |
+### What it understands
+
+| You say                                                                               | It does                                          |
+| ------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| "no first/last floor"                                                                 | cuts them from the results                       |
+| "elevator / parking required"                                                         | keeps only listings that have them               |
+| "it matters to me…" (elevator, parking, brick, new build, Act 16, furnished, discount) | gives them more weight in the score              |
+| "brick / panel / EPK only"                                                            | filters by construction type                     |
+| "best deals first"                                                                    | sorts by score (otherwise newest first)          |
+| "watch this" / "notify me"                                                            | saves the search and later shows only new listings |
 
 ---
 
-## 🚀 Пускане за 2 минути
+## 🚀 Up and running in 2 minutes
 
-Нужни са [uv](https://docs.astral.sh/uv/) и Python 3.14 (uv ще го изтегли сам) и безплатен ключ от [OpenRouter](https://openrouter.ai/).
+You need [uv](https://docs.astral.sh/uv/), Python 3.14 (uv will download it itself) and a free key from [OpenRouter](https://openrouter.ai/).
 
 ```bash
-git clone <адреса на репото>
-cd ai-agent
+git clone <repository URL>
+cd imotko
 uv sync
 ```
 
-Създай `.env` файл:
+Create a `.env` file from the template and put your key in it:
 
 ```bash
-OPENROUTER_API_KEY=твоят_ключ
+cp .env.example .env
 ```
 
-Готово. Избери как да го ползваш:
+Done. Pick how you want to use it:
 
-**1. В терминала** - най-бързо:
+**1. In the terminal** - the quickest:
 
 ```bash
-uv run imot_agent.py
+uv run chat.py
 ```
 
-**2. Като уеб сървър** (AgentOS на Agno) - с API и интерфейс:
+**2. As a web server** (Agno's AgentOS) - with an API and a UI:
 
 ```bash
 uv run app.py
 ```
 
-**3. Като пазач на обяви** - проверява запазените търсения и показва само новото:
+**3. As a listing watcher** - checks saved searches and shows only what is new:
 
 ```bash
 uv run watch.py
@@ -78,94 +80,85 @@ uv run watch.py
 
 ---
 
-## 🔔 Известия на телефона
+## 🔔 Phone notifications
 
-Не искаш да отваряш терминала на всеки час? Сложи в `.env`:
+Don't want to open the terminal every hour? Put this in `.env`:
 
 ```bash
-NTFY_TOPIC=някакво-тайно-име-на-тема
+NTFY_TOPIC=some-secret-topic-name
 ```
 
-Инсталирай приложението [ntfy](https://ntfy.sh/), абонирай се за същата тема и новите обяви ще идват като известие. Темата е публична за всеки, който я знае, така че измисли нещо уникално.
+Install the [ntfy](https://ntfy.sh/) app, subscribe to the same topic, and new listings will arrive as notifications. The topic is public to anyone who knows it, so pick something unique.
 
-За да върви сам, добави в `crontab -e`:
+To run it automatically, add this to `crontab -e`:
 
 ```cron
-0 * * * * cd /път/до/ai-agent && uv run watch.py
+0 * * * * cd /path/to/imotko && uv run watch.py
 ```
 
 ---
 
 ## 🐳 Docker
 
-Най-лесният начин да го пуснеш и да остане включен: на твоя сървър, NAS или евтин VPS, без лаптопът ти да е отворен. 24/7.
+The easiest way to run it and keep it running: on your own server, NAS or a cheap VPS, without your laptop having to stay open. 24/7.
 
 ```bash
-echo "OPENROUTER_API_KEY=твоят_ключ" > .env
+echo "OPENROUTER_API_KEY=your_key" > .env
 docker compose up -d --build
 ```
 
-Това вдига две неща:
+This starts two services:
 
-| Услуга | Какво прави |
+| Service | What it does |
 |---|---|
-| `imotko` | агентът (AgentOS) на http://localhost:7777. Чатиш с него през [os.agno.com](https://os.agno.com), като му сочиш към този адрес. |
-| `watch` | на всеки час проверява запазените търсения. Ако има `NTFY_TOPIC` в `.env`, новите обяви идват като известие. |
+| `imotko` | the agent (AgentOS) at http://localhost:7777. You chat with it through [os.agno.com](https://os.agno.com) by pointing it at this address. |
+| `watch` | checks saved searches every hour. If `NTFY_TOPIC` is set in `.env`, new listings arrive as notifications. |
 
-Какво е добре да знаеш:
+Good to know:
 
-- 💾 Базите (`imot.db` и `imot_history.db`) живеят в папката `data/` и оцеляват при рестарт и ъпдейт. Не ги трий, ако държиш на запазените търсения и историята на цените.
-- 🔑 `.env` не влиза в образа, а се чете при стартиране.
-- 🔄 Нова версия на кода: `git pull && docker compose up -d --build`.
-- 📜 Логове: `docker compose logs -f imotko` (или `watch`).
-- 🛑 Спиране: `docker compose down` (данните остават).
+- 💾 The databases (`imot.db` and `imot_history.db`) live in the `data/` folder and survive restarts and updates. Don't delete them if you care about saved searches and price history.
+- 🔑 `.env` is not baked into the image; it is read at startup.
+- 🔄 New version of the code: `git pull && docker compose up -d --build`.
+- 📜 Logs: `docker compose logs -f imotko` (or `watch`).
+- 🛑 Stop: `docker compose down` (data is kept).
 
-Ако го пускаш на сървър в интернет, не отваряй порт 7777 към света без защита (reverse proxy с парола или VPN).
-
----
-
-## ⚙️ Настройки (всичко е по желание)
-
-Всичко се задава в `.env`:
-
-| Променлива                   | За какво е                                                         | По подразбиране                          |
-| ---------------------------- | ------------------------------------------------------------------ | ---------------------------------------- |
-| `OPENROUTER_API_KEY`         | ключът ти към OpenRouter (**задължителен**)                        | -                                        |
-| `IMOT_MODEL`                 | основният модел                                                    | `google/gemma-4-31b-it:free`             |
-| `IMOT_FALLBACK_MODEL`        | резервен, когато основният върне 429                               | `nvidia/nemotron-3-ultra-550b-a55b:free` |
-| `IMOT_VISION_MODEL`          | модел за снимки (трябва да е мултимодален)                         | `google/gemma-4-31b-it:free`             |
-| `IMOT_VISION_FALLBACK_MODEL` | резервен за снимки                                                 | `nvidia/nemotron-3.5-super-vl:free`      |
-| `WATCH_MIN_SCORE`            | колко висока оценка трябва да има една нова обява, за да те бележи | `20`                                     |
-| `NTFY_TOPIC`                 | тема в ntfy.sh за известия                                         | изключено                                |
-
-> 💡 Безплатните модели понякога връщат 429 ("претоварен съм"). Затова има резервен - не се паникьоса, ако отговорът се забави.
+If you run it on a server on the internet, don't expose port 7777 to the world without protection (a reverse proxy with a password, or a VPN).
 
 ---
 
-## 🧩 Какво има вътре
+## ⚙️ Configuration (everything is optional)
 
-```
-imot_agent.py    # мозъкът: агентът и неговите инструменти
-imot_search.py   # търсене, оценяване, сравнение на квартали
-imot_scraper.py  # сваля и разчита обявите от imot.bg
-imot_vision.py   # анализ на снимки с мултимодален модел
-imot_store.py    # SQLite: история на цените и запазени търсения
-imot_models.py   # безплатните модели + резервни, ако някой падне
-app.py           # уеб сървър (AgentOS)
-watch.py         # проверка за нови обяви + известия
-tests/           # тестове
-Dockerfile       # образът на агента
-compose.yaml     # агент + пазач на обяви с една команда
-```
+Everything is set in `.env`:
 
-Историята на цените и запазените търсения са в `imot_history.db` (в Docker - в `data/`), извън git.
+| Variable                     | What it is for                                                       | Default                                  |
+| ---------------------------- | -------------------------------------------------------------------- | ---------------------------------------- |
+| `OPENROUTER_API_KEY`         | your OpenRouter key (**required**)                                   | -                                        |
+| `IMOT_MODEL`                 | the main model                                                       | `google/gemma-4-31b-it:free`             |
+| `IMOT_FALLBACK_MODEL`        | fallback, used when the main one returns 429                         | `nvidia/nemotron-3-ultra-550b-a55b:free` |
+| `IMOT_VISION_MODEL`          | model for photos (must be multimodal)                                | `google/gemma-4-31b-it:free`             |
+| `IMOT_VISION_FALLBACK_MODEL` | fallback for photos                                                  | `nvidia/nemotron-3.5-super-vl:free`      |
+| `WATCH_MIN_SCORE`            | minimum score a new listing needs in order to be flagged             | `20`                                     |
+| `NTFY_TOPIC`                 | ntfy.sh topic for notifications                                      | disabled                                 |
+
+> 💡 Free models sometimes return 429 ("I'm overloaded"). That is why there is a fallback - don't panic if an answer is slow.
 
 ---
 
-## ⚠️ Честно, за да не се обидиш после
+## 🔌 Want another site or another notification channel?
 
-- Имотко е **помощник, не оракул**. Оценката е ориентир, а не присъда. Огледът на място не се заменя.
-- Анализът на снимки е "на око". Размерът на хладилника например е приблизителен.
-- Данните идват от публичните страници на imot.bg. Не пускай заявки по-често от нужното и бъди добър гражданин.
+You don't touch the rest of the code, you only subclass:
 
-Успех с търсенето и дано намериш дом, а не само "добра инвестиция"! 🏡
+- new listings site (homes.bg, alo.bg...) -> a class that extends `ListingSource` in `imotko/sources/`, then register it in `imotko/sources/__init__.py`;
+- new channel (Telegram, email...) -> a class that extends `Notifier` in `imotko/notify.py`. You only need the `send` method.
+
+Price history and saved searches are stored in `imot_history.db` (in Docker, in `data/`), outside of git.
+
+---
+
+## ⚠️ Honest disclaimer, so you don't get upset later
+
+- Imotko is a **helper, not an oracle**. The score is a guideline, not a verdict. It does not replace viewing the property in person.
+- Photo analysis is "by eye". The size of a fridge, for example, is approximate.
+- The data comes from the public pages of imot.bg. Don't send requests more often than needed, and be a good citizen.
+
+Good luck with the search, and may you find a home, not just a "good investment"! 🏡

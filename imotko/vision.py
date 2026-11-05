@@ -1,22 +1,15 @@
 """Анализ на снимките на обява с мултимодален модел (хладилник, обзавеждане, състояние)."""
 
-import os
 from concurrent.futures import ThreadPoolExecutor
 
 import requests
 from agno.agent import Agent
 from agno.media import Image
 from agno.run import RunStatus
-from dotenv import load_dotenv
 
-import imot_scraper as scraper
-from imot_models import main_and_fallback_models
-
-load_dotenv()
-
-# Само мултимодални модели. Gemma 4 приема снимки, Nemotron Ultra - не.
-VISION_MODEL = os.getenv("IMOT_VISION_MODEL", "google/gemma-4-31b-it:free")
-VISION_FALLBACK_MODEL = os.getenv("IMOT_VISION_FALLBACK_MODEL", "nvidia/nemotron-3.5-super-vl:free")
+from imotko.config import VISION_FALLBACK_MODEL, VISION_MODEL
+from imotko.models import main_and_fallback_models
+from imotko.sources import source
 
 MAX_PHOTOS = 6
 MAX_PHOTO_BYTES = 1_500_000
@@ -39,7 +32,7 @@ vision_agent = Agent(model=main_model, fallback_models=fallback_models, instruct
 def _download_photo(url: str) -> bytes | None:
     """Снимката или None, ако не се изтегли или е прекалено голяма."""
     try:
-        photo = scraper.http_get(url).content
+        photo = source.download(url)
     except requests.RequestException:
         return None
 
@@ -55,15 +48,15 @@ def analyze_photos(listing_url: str, question: str = "") -> str:
         listing_url: Пълният линк към обявата от резултатите на search_apartments.
         question: Какво точно да се провери, например "голям ли е хладилникът?".
     """
-    if not scraper.listing_id(listing_url):
+    if not source.listing_id(listing_url):
         return "Нужен е пълен линк към обява от imot.bg (https://www.imot.bg/obiava-...)."
 
     try:
-        listing_html = scraper.fetch_html(listing_url)
+        listing_html = source.fetch_html(listing_url)
     except requests.RequestException as error:
         return f"Обявата не може да се зареди: {error}"
 
-    photo_urls = scraper.listing_photos(listing_html)[:MAX_PHOTOS]
+    photo_urls = source.listing_photos(listing_html)[:MAX_PHOTOS]
     if not photo_urls:
         return "Обявата няма снимки."
 

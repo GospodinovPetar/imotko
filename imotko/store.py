@@ -2,15 +2,13 @@
 
 import functools
 import json
-import os
 import sqlite3
 import time
 from contextlib import closing
 from itertools import batched
-from pathlib import Path
 
-# IMOT_DATA_DIR позволява базите да са извън кода (напр. volume в Docker)
-DATA_DIR = Path(os.getenv("IMOT_DATA_DIR", Path(__file__).parent))
+from imotko.config import DATA_DIR
+
 DB_PATH = DATA_DIR / "imot_history.db"
 
 SCHEMA = """

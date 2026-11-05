@@ -1,24 +1,14 @@
 """Агентът "Имотко": инструментите, които моделът може да вика, и самият агент."""
 
-import os
-
 import requests
 from agno.agent import Agent
 from agno.db.sqlite import SqliteDb
-from dotenv import load_dotenv
 
-import imot_search as search
-import imot_store as store
-import imot_vision as vision
-from imot_models import main_and_fallback_models
+from imotko import search, store, vision
+from imotko.config import DATA_DIR, FALLBACK_MODEL, MAIN_MODEL
+from imotko.models import main_and_fallback_models
 
-load_dotenv()
-
-MAIN_MODEL = os.getenv("IMOT_MODEL", "google/gemma-4-31b-it:free")
-# безплатните модели често връщат 429, затова има резервен
-FALLBACK_MODEL = os.getenv("IMOT_FALLBACK_MODEL", "nvidia/nemotron-3-ultra-550b-a55b:free")
-
-CHAT_HISTORY_DB = store.DATA_DIR / "imot.db"
+CHAT_HISTORY_DB = DATA_DIR / "imot.db"
 
 
 # Инструменти. Описанието (docstring) и Args се показват на модела.
@@ -202,7 +192,3 @@ imot_agent = Agent(
     tools=TOOLS,
     tool_hooks=[_return_errors_as_text],
 )
-
-
-if __name__ == "__main__":
-    imot_agent.cli_app(user="Какво търсиш", emoji="", user_id="default", exit_on=["", "изход"])

@@ -10,7 +10,8 @@ ENV PYTHONUNBUFFERED=1 \
 COPY pyproject.toml uv.lock .python-version ./
 RUN uv sync --locked --no-dev --no-install-project
 
-COPY *.py ./
+COPY app.py chat.py watch.py ./
+COPY imotko/ ./imotko/
 
 ENV PATH="/app/.venv/bin:$PATH" \
     IMOT_DATA_DIR=/data

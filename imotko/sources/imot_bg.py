@@ -14,6 +14,8 @@ from urllib.parse import urljoin
 import requests
 from bs4 import BeautifulSoup
 
+from imotko.sources.base import ListingSource
+
 
 BASE_URL = "https://www.imot.bg"
 BGN_PER_EUR = 1.95583
@@ -425,3 +427,34 @@ def add_details(listings) -> None:
                 listing[key] = value
 
     list(_download_pool.map(add_details_to_one, listings))
+
+
+# Клас за останалия код
+
+class ImotBg(ListingSource):
+    """imot.bg. Само подава към функциите по-горе."""
+
+    construction_types = CONSTRUCTION_TYPES
+    named_floors = NAMED_FLOORS
+    max_parallel_requests = MAX_PARALLEL_REQUESTS
+
+    def is_rent(self, deal: str) -> bool:
+        return DEALS.get(deal.strip().lower()) == "naemi"
+
+    def fetch_listings(self, deal, city, rooms, pages):
+        return fetch_listings(deal, city, rooms, pages)
+
+    def add_details(self, listings) -> None:
+        add_details(listings)
+
+    def listing_id(self, url):
+        return listing_id(url)
+
+    def fetch_html(self, url):
+        return fetch_html(url)
+
+    def listing_photos(self, html):
+        return listing_photos(html)
+
+    def download(self, url):
+        return http_get(url).content
