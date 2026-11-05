@@ -35,9 +35,22 @@ FEATURES = {
     "тераса": Feature("has_terrace", "тераса", "require_terrace", points=0, priority_points=5),
 }
 
-PRIORITIES = set(FEATURES) | {"тухла", "ново", "намаление"}
+PRIORITIES = set(FEATURES) | {"тухла", "ново", "намаление", "високетаж"}
 
-PRIORITY_SYNONYMS = {"новострой": "ново", "акт": "акт16", "спаднацена": "намаление", "балкон": "тераса"}
+PRIORITY_SYNONYMS = {
+    "новострой": "ново",
+    "акт": "акт16",
+    "спаднацена": "намаление",
+    "балкон": "тераса",
+    "висок": "високетаж",
+    "високиетаж": "високетаж",
+}
+
+# как се показва приоритетът в текста
+PRIORITY_NAMES = {"високетаж": "висок етаж", "акт16": "акт 16"}
+
+HIGH_FLOOR = 4
+HIGH_FLOOR_POINTS = 8
 
 
 def normalize_priorities(priorities: list[str] | None) -> set[str]:
@@ -94,7 +107,7 @@ def score_listing(listing: dict, reference_price: float, filters: dict, prioriti
     sheet = _ScoreSheet()
 
     _score_price(sheet, listing, reference_price)
-    _score_floor(sheet, listing)
+    _score_floor(sheet, listing, priorities)
     _score_building(sheet, listing, priorities)
     _score_features(sheet, listing, priorities)
     _score_price_drop(sheet, listing, priorities)
@@ -125,9 +138,13 @@ def _score_price(sheet: _ScoreSheet, listing: dict, reference_price: float) -> N
         sheet.add(percent_below_market, f"над пазара с {-percent_below_market:.0f}%")
 
 
-def _score_floor(sheet: _ScoreSheet, listing: dict) -> None:
+def _score_floor(sheet: _ScoreSheet, listing: dict, priorities: set[str]) -> None:
     if is_low_floor(listing) or is_top_floor(listing):
         sheet.add(-5, "първи/последен етаж")
+
+    floor = listing.get("floor")
+    if "високетаж" in priorities and floor is not None and floor >= HIGH_FLOOR:
+        sheet.add(HIGH_FLOOR_POINTS, f"висок етаж ({floor})")
 
 
 def _score_building(sheet: _ScoreSheet, listing: dict, priorities: set[str]) -> None:
