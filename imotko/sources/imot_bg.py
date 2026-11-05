@@ -4,7 +4,6 @@
 Останалите модули работят само с готовите речници с данни за обявите.
 """
 
-import functools
 import re
 import threading
 import time
@@ -103,6 +102,12 @@ def fetch_html(url: str) -> str:
     return html
 
 
+def forget_page(url: str) -> None:
+    """Маха страницата от кеша, за да се свали наново следващия път."""
+    with _page_cache_lock:
+        _page_cache.pop(url, None)
+
+
 def _remove_expired_pages(now: float) -> None:
     expired = []
     for url, (downloaded_at, _html) in _page_cache.items():
@@ -130,11 +135,27 @@ def city_slug(city: str) -> str:
     return "grad-" + latin
 
 
-@functools.cache
+_known_city_slugs: frozenset[str] = frozenset()
+
+
 def known_city_slugs() -> frozenset[str]:
-    """Градовете с обяви в imot.bg (областните центрове). Списъкът не се променя, затова се сваля веднъж."""
-    homepage = fetch_html(BASE_URL + "/")
-    return frozenset(re.findall(r"obiavi/prodazhbi/(grad-[a-z-]+)\"", homepage))
+    """Градовете с обяви в imot.bg (областните центрове). Списъкът не се променя, затова се сваля веднъж.
+
+    Ако сайтът върне страница без градове (временен проблем при тях), списъкът не се запомня
+    и се хвърля requests.RequestException, за да се опита пак при следващото търсене.
+    """
+    global _known_city_slugs
+    if _known_city_slugs:
+        return _known_city_slugs
+
+    homepage_url = BASE_URL + "/"
+    city_slugs = frozenset(re.findall(r"obiavi/prodazhbi/(grad-[a-z-]+)\"", fetch_html(homepage_url)))
+    if not city_slugs:
+        forget_page(homepage_url)
+        raise requests.RequestException("imot.bg не върна списъка с градове")
+
+    _known_city_slugs = city_slugs
+    return city_slugs
 
 
 def listing_url(deal: str, city: str, rooms: str) -> str:
@@ -343,11 +364,16 @@ def fetch_listings(deal: str, city: str, rooms: str, pages: int) -> tuple[list[d
 
     def fetch_one_page(url: str) -> list[dict]:
         try:
-            return parse_listing_page(fetch_html(url))
+            page_listings = parse_listing_page(fetch_html(url))
         except requests.RequestException as error:
             status = getattr(error.response, "status_code", None)
             errors.append(f"{url}: {status or error}")
             return []
+
+        if not page_listings:
+            # празна страница може да е временен проблем при тях: да не стои 10 минути в кеша
+            forget_page(url)
+        return page_listings
 
     listings_by_id: dict[str, dict] = {}
     for page_listings in _download_pool.map(fetch_one_page, urls):
