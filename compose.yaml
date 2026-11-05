@@ -1,5 +1,12 @@
 name: imotko
 
+# логовете се въртят: най-много 3 файла по 10 MB на услуга
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   # Агентът (AgentOS): http://localhost:7777, чат през https://os.agno.com
   imotko:
@@ -8,21 +15,28 @@ services:
     env_file:
       - path: .env
         required: false
+    # само от този компютър: os.agno.com работи през браузъра, който се свързва към localhost
     ports:
-      - "7777:7777"
+      - "127.0.0.1:7777:7777"
     volumes:
       - ./data:/data
     restart: unless-stopped
+    logging: *logging
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:7777/health', timeout=5)"]
+      interval: 1m
+      timeout: 10s
+      start_period: 30s
+      retries: 3
 
-  # Проверява запазените търсения на всеки час (известия, ако има NTFY_TOPIC в .env)
   watch:
     image: imotko
-    depends_on:
-      - imotko
+    pull_policy: never
     env_file:
       - path: .env
         required: false
-    command: ["sh", "-c", "while true; do python watch.py; sleep 3600; done"]
+    command: ["sh", "-c", "while true; do python watch.py; sleep $$((3600 - $$(date +%s) % 3600)); done"]
     volumes:
       - ./data:/data
     restart: unless-stopped
+    logging: *logging
