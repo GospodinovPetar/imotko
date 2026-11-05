@@ -59,10 +59,12 @@ def search_apartments(
     rooms: str,
     deal: str = "продажба",
     max_price_eur: int | None = None,
+    max_price_with_parking_eur: int | None = None,
     min_price_eur: int | None = None,
     min_area_m2: int | None = None,
     max_area_m2: int | None = None,
-    district: str | None = None,
+    districts: list[str] | None = None,
+    exclude_districts: list[str] | None = None,
     construction: str | None = None,
     exclude_first_floor: bool = False,
     exclude_last_floor: bool = False,
@@ -87,10 +89,13 @@ def search_apartments(
         rooms: "1", "2", "3", "4", "многостаен", "мезонет" или "студио".
         deal: "продажба" или "наем".
         max_price_eur: Максимална цена в евро.
+        max_price_with_parking_eur: По-висок таван само за обяви с паркинг, например наем до 650 €,
+            а с паркинг до 750 € -> max_price_eur=650, max_price_with_parking_eur=750.
         min_price_eur: Минимална цена в евро.
         min_area_m2: Минимална квадратура.
         max_area_m2: Максимална квадратура.
-        district: Част от името на квартал, например "Лозенец".
+        districts: Само тези квартали, например ["Лозенец", "Иван Вазов"]. Без него се търси в целия град.
+        exclude_districts: Квартали, които потребителят не иска, например ["Студентски град"].
         construction: "тухла", "панел", "епк", "пк", "гредоред" или "монолит".
         exclude_first_floor: Без първи етаж.
         exclude_last_floor: Без последен етаж.
@@ -99,7 +104,8 @@ def search_apartments(
         require_parking: Само с паркинг или гараж.
         require_furnished: Само обзаведени (отпадат необзаведените и повечето в строеж).
         require_terrace: Само с тераса или балкон.
-        priorities: Какво е важно за потребителя, от: асансьор, паркинг, тухла, ново, акт16, обзаведен, намаление, тераса.
+        priorities: Какво е важно за потребителя (дава точки, не филтрира), от: асансьор, паркинг, тухла, ново,
+            акт16, обзаведен, намаление, тераса, висок етаж (от 4-ти нагоре).
         order_by: "date_created" (подразбиране) - най-новите обяви първо; "score" - най-изгодните първо.
         commute_to: Местата, до които потребителят пътува често (най-много 4), с пълните имена,
             например ["Бизнес парк София"]. Първото е най-важното: обявите по-близо до него получават повече точки.
@@ -113,10 +119,12 @@ def search_apartments(
         "rooms": rooms,
         "deal": deal,
         "max_price_eur": max_price_eur,
+        "max_price_with_parking_eur": max_price_with_parking_eur,
         "min_price_eur": min_price_eur,
         "min_area_m2": min_area_m2,
         "max_area_m2": max_area_m2,
-        "district": district,
+        "district": districts,
+        "exclude_districts": exclude_districts,
         "construction": construction,
         "exclude_first_floor": exclude_first_floor,
         "exclude_last_floor": exclude_last_floor,

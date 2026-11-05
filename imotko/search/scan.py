@@ -8,7 +8,7 @@ from itertools import batched
 
 from imotko import store
 from imotko.geo import enrich
-from imotko.search import scoring
+from imotko.search import requirements, scoring
 from imotko.sources import source
 
 MIN_LISTINGS_FOR_DISTRICT_MEDIAN = 5
@@ -16,7 +16,8 @@ MIN_LISTINGS_FOR_DISTRICT_MEDIAN = 5
 MAX_DETAIL_CHECKS = 25  # толкова обяви най-много проверяваме в детайли (по една заявка на обява)
 
 FILTERS = {
-    "max_price_eur", "min_price_eur", "min_area_m2", "max_area_m2", "district", "construction",
+    "max_price_eur", "max_price_with_parking_eur", "min_price_eur", "min_area_m2", "max_area_m2",
+    "district", "exclude_districts", "construction",
     "exclude_first_floor", "exclude_last_floor", "exclude_in_construction",
     "require_elevator", "require_parking", "require_furnished", "require_terrace",
 }
@@ -97,46 +98,22 @@ def remove_duplicates(listings: list[dict]) -> list[dict]:
 
 def _passes_basic_filters(listing: dict, filters: dict) -> bool:
     """Филтрите, които се проверяват още от списъка с обяви."""
-    price = listing["price_eur"]
-    area = listing["area_m2"]
-
-    if filters.get("max_price_eur") and price > filters["max_price_eur"]:
-        return False
-    if filters.get("min_price_eur") and price < filters["min_price_eur"]:
-        return False
-    if filters.get("min_area_m2") and (area or 0) < filters["min_area_m2"]:
-        return False
-    if filters.get("max_area_m2") and area and area > filters["max_area_m2"]:
-        return False
-
-    district = filters.get("district")
-    if district:
-        searchable_text = f"{listing['location']} {listing['info']}".lower()
-        if district.lower() not in searchable_text:
-            return False
-
-    return True
+    return requirements.passes(requirements.list_page_checks(listing, filters))
 
 
 def _passes_detail_filters(listing: dict, filters: dict) -> bool:
     """Филтрите, за които трябва страницата на обявата. Неизвестно поле не минава изискване."""
-    if filters.get("exclude_first_floor") and scoring.is_low_floor(listing):
-        return False
-    if filters.get("exclude_last_floor") and scoring.is_top_floor(listing):
-        return False
-    if filters.get("exclude_in_construction") and listing.get("in_construction"):
-        return False
+    return requirements.passes(requirements.all_checks(listing, filters))
 
-    construction = filters.get("construction")
-    if construction and listing.get("construction") != construction.lower():
-        return False
 
-    for feature in scoring.FEATURES.values():
-        is_required = feature.required_filter and filters.get(feature.required_filter)
-        if is_required and not listing.get(feature.field):
-            return False
-
-    return True
+def _unmatched_district_notes(listings: list[dict], filters: dict) -> list[str]:
+    """Квартал, който не съвпада с нито една обява, обикновено е написан различно от imot.bg."""
+    notes = []
+    for name in requirements.district_names(filters, "district"):
+        is_found = any(name.lower() in listing["location"].lower() for listing in listings)
+        if not is_found:
+            notes.append(f"кварталът \"{name}\" не съвпада с нито една обява (може да е написан различно в imot.bg)")
+    return notes
 
 
 def scan_market(city: str, rooms: str, deal: str, pages: int):
@@ -189,7 +166,8 @@ def run_search(
     matching, detail_checked = _check_details(candidates, filters, top, order_by)
 
     #  Място: квартал, улица, магазини, време до целта (с кеш; при грешка обявите остават без тях)
-    notes = _add_location_data(matching, city, commute_to)
+    notes = _unmatched_district_notes(listings, filters)
+    notes += _add_location_data(matching, city, commute_to)
 
     # Окончателна оценка с всички данни
     for listing in matching:
@@ -208,6 +186,8 @@ def run_search(
             "city_median_ppm": city_median,
             "errors": errors,
             "notes": notes,
+            "filters": filters,
+            "applied": requirements.filters_text(filters, priorities, enrich.commute_targets(commute_to)),
         },
     }
 

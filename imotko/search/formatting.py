@@ -3,7 +3,7 @@
 from urllib.parse import quote_plus
 
 from imotko.geo import transit
-from imotko.search import scan, scoring
+from imotko.search import requirements, scan, scoring
 from imotko.sources import source
 
 
@@ -50,18 +50,21 @@ def format_results(result: dict) -> str:
         f"от {meta['detail_checked']} проверени в детайли {meta['after_detail']} отговарят на всички условия. "
         f"Медиана за града: {format_price_per_m2(meta['city_median_ppm'], deal)} €/кв.м."
     )
+    if meta.get("applied"):
+        header += "\n" + meta["applied"]
     for note in meta.get("notes", []):
         header += f"\nБележка: {note}."
     if not listings:
         return header + "\nНито една не отговаря на всички условия."
 
+    filters = meta.get("filters") or {}
     lines = [header, ""]
     for number, listing in enumerate(listings, 1):
-        lines.append(_format_listing(number, listing, deal))
+        lines.append(_format_listing(number, listing, deal, filters))
     return "\n".join(lines)
 
 
-def _format_listing(number: int, listing: dict, deal: str) -> str:
+def _format_listing(number: int, listing: dict, deal: str, filters: dict | None = None) -> str:
     price_per_m2 = format_price_per_m2(listing["eur_per_m2"], deal) if listing["eur_per_m2"] else "?"
     reference = format_price_per_m2(listing["ref_ppm"], deal)
 
@@ -73,9 +76,12 @@ def _format_listing(number: int, listing: dict, deal: str) -> str:
     )
     features_text = ", ".join(_feature_names(listing)) or "-"
     reasons_text = "; ".join(listing["reasons"]) or "-"
-    second_line = f"   {features_text}; защо: {reasons_text}"
+    second_line = f"   {features_text}; {_parking_text(listing)}; защо: {reasons_text}"
 
     lines = [first_line, second_line]
+    conditions_line = _conditions_line(listing, filters or {})
+    if conditions_line:
+        lines.append(conditions_line)
     lines += _place_lines(listing)
     for warning in listing.get("warnings", []):
         lines.append(f"   ⚠ {warning}")
@@ -89,6 +95,20 @@ def _address_text(listing: dict) -> str:
     if listing.get("street"):
         address += f", {listing['street']}"
     return address
+
+
+def _parking_text(listing: dict) -> str:
+    if listing.get("has_parking"):
+        return "паркинг: да"
+    return "паркинг: не пише в обявата"
+
+
+def _conditions_line(listing: dict, filters: dict) -> str:
+    """Всяко условие на потребителя с ✓ (изпълнено), ✗ (не е) или ? (не е посочено в обявата)."""
+    checks = requirements.all_checks(listing, filters)
+    if not checks:
+        return ""
+    return "   условия: " + "; ".join(f"{check.status} {check.text}" for check in checks)
 
 
 def _feature_names(listing: dict) -> list[str]:

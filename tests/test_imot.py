@@ -304,3 +304,122 @@ class Models(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class EmptyPagesAreNotCached(unittest.TestCase):
+    """При временен проблем imot.bg връща празни страници. Те не бива да остават в кеша."""
+
+    def setUp(self):
+        for patcher in (
+            mock.patch.dict(sc._page_cache, clear=True),
+            mock.patch.object(sc, "_known_city_slugs", frozenset()),
+        ):
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+    @staticmethod
+    def page(html: str):
+        return mock.Mock(content=html.encode("cp1251", errors="replace"))
+
+    def test_empty_listing_page_is_downloaded_again(self):
+        empty = self.page("<html><div>Няма намерени обяви!</div></html>")
+        full = self.page((FIXTURES / "listing_sofia_2.html").read_text(encoding="utf-8"))
+        sc._known_city_slugs = frozenset({"grad-sofiya"})
+
+        with mock.patch.object(sc, "http_get", side_effect=[empty, full]) as http_get:
+            during_problem, _ = sc.fetch_listings("продажба", "София", "2", 1)
+            after_problem, _ = sc.fetch_listings("продажба", "София", "2", 1)
+            from_cache, _ = sc.fetch_listings("продажба", "София", "2", 1)
+
+        self.assertEqual(during_problem, [])
+        self.assertGreater(len(after_problem), 0)
+        self.assertEqual(len(from_cache), len(after_problem))
+        self.assertEqual(http_get.call_count, 2)
+
+    def test_city_list_is_not_remembered_when_empty(self):
+        broken = self.page("<html>грешка</html>")
+        working = self.page('<a href="/obiavi/prodazhbi/grad-sofiya">София</a>')
+
+        with mock.patch.object(sc, "http_get", side_effect=[broken, working]):
+            with self.assertRaises(requests.RequestException):
+                sc.known_city_slugs()
+            self.assertEqual(sc.known_city_slugs(), frozenset({"grad-sofiya"}))
+
+
+class Requirements(unittest.TestCase):
+    """Филтрите и редът "условия" ползват едни и същи проверки."""
+
+    @staticmethod
+    def listing(**fields):
+        base = {"price_eur": 600.0, "area_m2": 70.0, "location": "град София, Лозенец", "info": "",
+                "floor": 5, "floors_total": 8, "has_parking": False, "has_elevator": True, "has_terrace": True}
+        return {**base, **fields}
+
+    def statuses(self, listing, filters):
+        from imotko.search import requirements
+        return [(check.status, check.text) for check in requirements.all_checks(listing, filters)]
+
+    def test_parking_allows_higher_rent(self):
+        from imotko.search import requirements
+        filters = {"max_price_eur": 650, "max_price_with_parking_eur": 750}
+        expensive = self.listing(price_eur=700.0)
+        expensive_with_parking = self.listing(price_eur=700.0, has_parking=True)
+
+        # от списъка още не се знае дали има паркинг: обявата се проверява в детайли
+        self.assertTrue(requirements.passes(requirements.list_page_checks(expensive, filters)))
+        self.assertFalse(requirements.passes(requirements.all_checks(expensive, filters)))
+        self.assertTrue(requirements.passes(requirements.all_checks(expensive_with_parking, filters)))
+        self.assertFalse(requirements.passes(requirements.list_page_checks(self.listing(price_eur=800.0), filters)))
+        self.assertIn("защото има паркинг", self.statuses(expensive_with_parking, filters)[0][1])
+
+    def test_districts_match_location_not_street(self):
+        from imotko.search import requirements
+        on_vitosha_boulevard = self.listing(location="град София, Център", info="бул. Витоша 20")
+        filters = {"district": ["Лозенец", "Иван Вазов"], "exclude_districts": ["Витоша"]}
+
+        self.assertFalse(requirements.passes(requirements.all_checks(on_vitosha_boulevard, filters)))
+        self.assertTrue(requirements.passes(requirements.all_checks(self.listing(), filters)))
+        self.assertTrue(requirements.passes(requirements.all_checks(on_vitosha_boulevard, {"exclude_districts": ["Витоша"]})))
+        self.assertFalse(requirements.passes(requirements.all_checks(self.listing(location="град София, Витоша"),
+                                                                     {"exclude_districts": ["Витоша"]})))
+        # по-старите запазени търсения пазят един квартал като текст
+        self.assertTrue(requirements.passes(requirements.all_checks(self.listing(), {"district": "Лозенец"})))
+
+    def test_unknown_floor_passes_but_is_said(self):
+        statuses = self.statuses(self.listing(floor=None, floors_total=None), {"exclude_first_floor": True})
+        self.assertEqual(statuses, [("?", "етажът не е посочен в обявата")])
+
+    def test_missing_required_feature_fails(self):
+        from imotko.search import requirements
+        checks = requirements.all_checks(self.listing(has_parking=False), {"require_parking": True})
+        self.assertFalse(requirements.passes(checks))
+        self.assertEqual(checks[0].text, "паркинг: не пише в обявата")
+
+    def test_applied_filters_text(self):
+        from imotko.search import requirements
+        text = requirements.filters_text(
+            {"max_price_eur": 650, "max_price_with_parking_eur": 750, "min_area_m2": 60, "district": ["Лозенец"],
+             "exclude_districts": ["Витоша"], "exclude_first_floor": True, "require_terrace": True},
+            {"високетаж", "паркинг"}, ["SAP Labs Bulgaria, бул. Цариградско шосе 136А"])
+        self.assertIn("цена до 650 € (с паркинг до 750 €)", text)
+        self.assertIn("над 60 кв.м", text)
+        self.assertIn("квартали: Лозенец", text)
+        self.assertIn("без: Витоша", text)
+        self.assertIn("задължително тераса", text)
+        self.assertIn("висок етаж", text)
+        self.assertIn("SAP Labs Bulgaria", text)
+
+    def test_high_floor_priority_gives_points(self):
+        listing = {**self.listing(), "eur_per_m2": None, "price_change_pct": None}
+        without, _ = scoring.score_listing(listing, 0, {}, set())
+        with_priority, reasons = scoring.score_listing(listing, 0, {}, {"високетаж"})
+        self.assertEqual(with_priority - without, scoring.HIGH_FLOOR_POINTS)
+        self.assertIn("висок етаж (5)", reasons)
+        self.assertEqual(scoring.normalize_priorities(["висок етаж"]), {"високетаж"})
+
+    def test_short_commute_labels(self):
+        from imotko.geo import enrich
+        labels = enrich.commute_labels(["SAP Labs Bulgaria, бул. Цариградско шосе 136А", "бул. Цар Борис III 81"])
+        self.assertEqual(list(labels.values()), ["SAP Labs Bulgaria", "бул. Цар Борис III 81"])
+        same = enrich.commute_labels(["Бизнес парк, сграда 1", "Бизнес парк, сграда 7"])
+        self.assertEqual(list(same.values()), ["Бизнес парк, сграда 1", "Бизнес парк, сграда 7"])
