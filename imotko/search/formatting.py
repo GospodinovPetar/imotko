@@ -74,17 +74,17 @@ def _format_listing(number: int, listing: dict, deal: str, filters: dict | None 
         f"(реф. {listing['ref_kind']}: {reference}) | етаж {_floor_text(listing)} | "
         f"оценка {listing['score']}{_extra_text(listing)}"
     )
-    features_text = ", ".join(_feature_names(listing)) or "-"
     reasons_text = "; ".join(listing["reasons"]) or "-"
-    second_line = f"   {features_text}; {_parking_text(listing)}; защо: {reasons_text}"
 
-    lines = [first_line, second_line]
+    lines = [first_line, _details_line(listing)]
     conditions_line = _conditions_line(listing, filters or {})
     if conditions_line:
         lines.append(conditions_line)
+    lines.append(f"   защо тази оценка: {reasons_text}")
     lines += _place_lines(listing)
     for warning in listing.get("warnings", []):
         lines.append(f"   ⚠ {warning}")
+    lines.append("   снимки: не са проверени (analyze_photos с линка на обявата)")
     lines.append(f"   {listing['url']}")
     lines.append(f"   карта: {_map_link(listing)}")
     return "\n".join(lines)
@@ -97,10 +97,25 @@ def _address_text(listing: dict) -> str:
     return address
 
 
-def _parking_text(listing: dict) -> str:
-    if listing.get("has_parking"):
-        return "паркинг: да"
-    return "паркинг: не пише в обявата"
+def _details_line(listing: dict) -> str:
+    """Всеки белег изрично: "да" или "не пише в обявата", никога пропуснат."""
+    parts = [f"етаж: {_floor_details(listing)}"]
+    for feature in scoring.FEATURES.values():
+        value = "да" if listing.get(feature.field) else "не пише в обявата"
+        parts.append(f"{feature.label}: {value}")
+    parts.append(f"строителство: {listing.get('construction') or 'не е посочено'}")
+    if listing.get("year_built"):
+        parts.append(f"година: {listing['year_built']}")
+    if listing.get("in_construction"):
+        parts.append("в строеж")
+    return "   " + "; ".join(parts)
+
+
+def _floor_details(listing: dict) -> str:
+    floor_text = _floor_text(listing)
+    if floor_text == "?":
+        return "не е посочен в обявата"
+    return floor_text
 
 
 def _conditions_line(listing: dict, filters: dict) -> str:
@@ -109,16 +124,6 @@ def _conditions_line(listing: dict, filters: dict) -> str:
     if not checks:
         return ""
     return "   условия: " + "; ".join(f"{check.status} {check.text}" for check in checks)
-
-
-def _feature_names(listing: dict) -> list[str]:
-    names = []
-    if listing.get("construction"):
-        names.append(listing["construction"])
-    for feature in scoring.FEATURES.values():
-        if listing.get(feature.field):
-            names.append(feature.label)
-    return names
 
 
 def _extra_text(listing: dict) -> str:
@@ -149,6 +154,8 @@ def _place_lines(listing: dict) -> list[str]:
     chains = listing.get("chains")
     if chains:
         lines.append(_chains_line(chains))
+    else:
+        lines.append("   магазини: няма данни")
 
     chain_near_street = listing.get("chain_near_street")
     if chain_near_street:
@@ -198,6 +205,10 @@ def _commute_line(commute: dict) -> str:
     transit_route = commute.get("transit")
     if transit_route and transit_route.get("ok"):
         line += f"; транспорт {transit.short_text(transit_route)}"
+    elif transit_route:
+        line += f"; транспорт: няма данни ({transit_route.get('reason', 'грешка')})"
+    else:
+        line += "; транспорт: няма разписание за града"
     return line
 
 

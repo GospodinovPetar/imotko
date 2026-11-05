@@ -230,7 +230,7 @@ def filters_text(filters: dict, priorities: set[str] | list[str] | None, commute
     lines = ["Приложени филтри: " + ("; ".join(parts) if parts else "няма")]
     if priorities:
         names = [scoring.PRIORITY_NAMES.get(priority, priority) for priority in sorted(priorities)]
-        lines.append("Приоритети (дават точки): " + ", ".join(names))
+        lines.append("Приоритети (само дават точки, не махат обяви): " + ", ".join(names))
     if commute_to:
         lines.append("Места за път (по важност): " + "; ".join(commute_to))
     return "\n".join(lines)

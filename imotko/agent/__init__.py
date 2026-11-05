@@ -23,8 +23,7 @@ TOOLS = [
 ]
 
 
-# Моделите с мислене (DeepSeek и др.) харчат част от лимита за мислене. При 2048 отговорът
-# понякога оставаше празен след голямо търсене.
+# При 2048 отговорът понякога оставаше празен след голямо търсене.
 MAX_ANSWER_TOKENS = 8192
 MAX_TOOL_RESULTS_FROM_HISTORY = 2
 
@@ -39,12 +38,9 @@ imot_agent = Agent(
     db=SqliteDb(db_file=str(CHAT_HISTORY_DB)),
     add_history_to_context=True,
     num_history_runs=3,
-    # от предишните отговори остават само последните 2 резултата от инструменти (едно търсене е
-    # ~10 хил. токена); моделът помни своите отговори, но не влачи старите списъци с обяви
     max_tool_calls_from_history=MAX_TOOL_RESULTS_FROM_HISTORY,
     tools=TOOLS,
     tool_hooks=[hooks.return_errors_as_text],
     pre_hooks=[hooks.shrink_uploaded_images],
-    # всяко число в отговора трябва да идва от инструмент; съмнителните отговори се записват
     post_hooks=[monitoring.check_answer],
 )

@@ -32,7 +32,7 @@ FEATURES = {
     "акт16": Feature("has_act16", "акт 16", None, points=2, priority_points=5),
     "обзаведен": Feature("furnished", "обзаведен", "require_furnished", points=0, priority_points=6),
     # почти всички апартаменти имат тераса, затова точки само когато е важна за потребителя
-    "тераса": Feature("has_terrace", "тераса", "require_terrace", points=0, priority_points=5),
+    "тераса": Feature("has_terrace", "тераса/балкон", "require_terrace", points=0, priority_points=5),
 }
 
 PRIORITIES = set(FEATURES) | {"тухла", "ново", "намаление", "високетаж"}
