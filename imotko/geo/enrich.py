@@ -58,12 +58,25 @@ def add_location_data(listings: list[dict], city: str, commute_to: str | list[st
             _add_chains(listing, street, stores, chains_by_district)
 
     targets = commute_targets(commute_to)
-    for number, target in enumerate(targets, 1):
-        # при няколко цели в списъка пише "цел 1", за да не се повтаря дългото име при всяка обява
-        label = target if len(targets) == 1 else f"цел {number}"
-        notes += _add_commute(listings, listing_streets, city, target, label, districts)
+    labels = commute_labels(targets)
+    for target in targets:
+        notes += _add_commute(listings, listing_streets, city, target, labels[target], districts)
 
     return notes
+
+
+def commute_labels(targets: list[str]) -> dict[str, str]:
+    """Името, с което целта се показва при всяка обява: частта преди първата запетая.
+
+    "SAP Labs Bulgaria, бул. Цариградско шосе 136А" -> "SAP Labs Bulgaria". Ако две цели
+    имат еднакво кратко име, остават пълните имена, за да не се объркат.
+    """
+    short_names = {target: target.split(",")[0].strip() or target for target in targets}
+    labels = {}
+    for target, short_name in short_names.items():
+        same_short_name = [other for other, name in short_names.items() if name == short_name]
+        labels[target] = short_name if len(same_short_name) == 1 else target
+    return labels
 
 
 def _load_chain_stores(city: str, notes: list[str]) -> tuple | None:
@@ -139,7 +152,7 @@ def _add_chains(listing: dict, street: dict | None, stores: list, chains_by_dist
 
 def _add_commute(listings, listing_streets, city, commute_to, label, districts) -> list[str]:
     """Време с кола и с градски транспорт до целта. Връща бележките за самата цел."""
-    prefix = "" if label == commute_to else f"{label}: "
+    prefix = f"{label}: "
     target = geocode.locate_any(commute_to, city)
     if target is None:
         return [f"{prefix}не успях да намеря \"{commute_to}\" в картата, затова няма време до него"]

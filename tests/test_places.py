@@ -330,7 +330,7 @@ class AddLocationData(TempDatabase):
         self.assertAlmostEqual(without_street["commute"]["district_minutes"], 9.0 + 6.0)
         self.assertIn("Бизнес парк София", notes[0])
 
-    def test_two_targets_are_numbered_and_first_is_scored(self):
+    def test_two_targets_are_named_and_first_is_scored(self):
         mladost = {"found": True, "lat": 42.65, "lon": 23.375, "name": "Младост 1, София", "kind": "district",
                    "area": MLADOST_AREA, "warnings": []}
         unss = {"found": True, "lat": 42.6505, "lon": 23.3486, "name": "УНСС", "kind": "place", "area": None, "warnings": []}
@@ -350,15 +350,15 @@ class AddLocationData(TempDatabase):
             notes = enrich.add_location_data(listings, "София", ["УНСС", "ТУ"])
 
         commutes = listings[0]["commutes"]
-        self.assertEqual([commute["label"] for commute in commutes], ["цел 1", "цел 2"])
+        self.assertEqual([commute["label"] for commute in commutes], ["УНСС", "ТУ"])
         self.assertIs(listings[0]["commute"], commutes[0])
         self.assertAlmostEqual(commutes[1]["minutes"], 15.0)
-        self.assertTrue(any(note.startswith("цел 2: целта \"ТУ\"") for note in notes))
+        self.assertTrue(any(note.startswith("ТУ: целта \"ТУ\"") for note in notes))
         text = formatting._format_listing(1, {**listings[0], "title": "2-СТАЕН", "location": "Младост 1", "price_eur": 500,
                                           "area_m2": 60, "eur_per_m2": 8.3, "ref_ppm": 8.0, "ref_kind": "квартал",
                                           "score": 10, "reasons": [], "url": "u", "floor": None}, "наем")
-        self.assertIn("до цел 1: ~11 мин с кола", text)
-        self.assertIn("до цел 2: ~15 мин с кола", text)
+        self.assertIn("до УНСС: ~11 мин с кола", text)
+        self.assertIn("до ТУ: ~15 мин с кола", text)
 
     def test_no_chain_data_starts_refresh_and_says_so(self):
         with (

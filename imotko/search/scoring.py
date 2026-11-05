@@ -235,10 +235,7 @@ def _place_points(listing: dict) -> tuple[int, list[str]]:
 
 
 def _commute_place_name(commute: dict) -> str:
-    label = commute.get("label", commute["target"])
-    if label == commute["target"]:
-        return "целта"
-    return commute["label"]
+    return commute.get("label", commute["target"])
 
 
 def listing_warnings(listing: dict) -> list[str]:
