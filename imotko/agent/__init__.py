@@ -6,7 +6,7 @@ from agno.db.sqlite import SqliteDb
 from imotko import vision
 from imotko.agent import hooks, instructions, tools
 from imotko.config import DATA_DIR, FALLBACK_MODEL, MAIN_MODEL
-from imotko.models import main_and_fallback_models
+from imotko.models import MemoryManagerWithFallback, main_and_fallback_models
 from imotko.quality import monitoring
 
 CHAT_HISTORY_DB = DATA_DIR / "imot.db"
@@ -27,7 +27,16 @@ TOOLS = [
 MAX_ANSWER_TOKENS = 8192
 MAX_TOOL_RESULTS_FROM_HISTORY = 2
 
+# Паметта пази само трайните предпочитания, не обявите: те се менят всеки ден.
+MEMORY_CAPTURE_INSTRUCTIONS = (
+    "Запомняй само трайни предпочитания на потребителя за търсене на жилище: град, бюджет, брой стаи, "
+    "квартали, които харесва или не иска, места, до които пътува често (работа, училище), приоритети "
+    "(паркинг, висок етаж, балкон), неща, които не иска (последен етаж, панел). "
+    "Не запомняй конкретни обяви, цени и резултати от търсения, еднократни въпроси и лични данни извън търсенето."
+)
+
 main_model, fallback_models = main_and_fallback_models(MAIN_MODEL, FALLBACK_MODEL, max_tokens=MAX_ANSWER_TOKENS, temperature=0.3)
+database = SqliteDb(db_file=str(CHAT_HISTORY_DB))
 
 imot_agent = Agent(
     id="imot",
@@ -35,7 +44,15 @@ imot_agent = Agent(
     model=main_model,
     fallback_models=fallback_models,
     instructions=instructions.INSTRUCTIONS,
-    db=SqliteDb(db_file=str(CHAT_HISTORY_DB)),
+    db=database,
+    enable_agentic_memory=True,
+    memory_manager=MemoryManagerWithFallback(
+        model=main_model,
+        fallback_model=fallback_models[0],
+        db=database,
+        memory_capture_instructions=MEMORY_CAPTURE_INSTRUCTIONS,
+        additional_instructions="Пиши паметите на български, като кратки изречения.",
+    ),
     add_history_to_context=True,
     num_history_runs=3,
     max_tool_calls_from_history=MAX_TOOL_RESULTS_FROM_HISTORY,

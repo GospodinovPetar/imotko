@@ -1,6 +1,7 @@
 """Безплатните модели през OpenRouter, всеки с резервен модел."""
 
 from agno.exceptions import ModelProviderError
+from agno.memory import MemoryManager
 from agno.models.openrouter import OpenRouter
 
 # agno минава на резервния модел само при 429, 5xx и мрежови грешки.
@@ -54,3 +55,28 @@ def main_and_fallback_models(main_model: str, fallback_model: str, **settings):
     main = FreeOpenRouter(main_model, **settings)
     fallbacks = [FreeOpenRouter(fallback_model, **settings)]
     return main, fallbacks
+
+
+class MemoryManagerWithFallback(MemoryManager):
+    """Паметта на агента, която при недостъпен модел опитва резервния.
+
+    agno ползва резервния модел само за самия агент, а записът в паметта е отделна заявка към модела.
+    """
+
+    def __init__(self, *args, fallback_model=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fallback_model = fallback_model
+
+    def run_memory_task(self, *args, **kwargs):
+        try:
+            return super().run_memory_task(*args, **kwargs)
+        except ModelProviderError:
+            if self.fallback_model is None:
+                raise
+
+        main_model = self.model
+        self.model = self.fallback_model
+        try:
+            return super().run_memory_task(*args, **kwargs)
+        finally:
+            self.model = main_model
