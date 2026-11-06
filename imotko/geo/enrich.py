@@ -3,9 +3,12 @@
 Мрежова грешка никога не спира търсенето: обявата просто остава без тези данни.
 """
 
-from imotko.geo import common, driving, geocode, shops, transit
+from imotko.geo import addresses, common, driving, geocode, shops, stops, transit
 
 MAX_COMMUTE_TARGETS = 4
+MAX_KM_STREET_FROM_STOP = 1.5
+MIN_KM_STREET_FROM_STOP = 0.4  # при написано разстояние ("на 100 м") се търпи поне толкова
+PRECISION_BY_KIND = {stops.KIND: stops.PRECISION, "address": "адрес"}
 
 
 def commute_targets(commute_to: str | list[str] | None) -> list[str]:
@@ -28,8 +31,12 @@ def add_location_data(listings: list[dict], city: str, commute_to: str | list[st
 
     - "chains": веригите в квартала (липсва, ако няма данни);
     - "chain_near_street": (верига, км) до 500 м от улицата, ако обявата има улица;
+    - "address_from_description": адрес с номер от описанието ("ул. Българска легия 28"). Ако обявата няма
+      улица, става нейна улица; ако има същата улица без номер, получава номера;
+    - "stop": спирка или метростанция от описанието на обявата (ако е написана и е намерена);
+      при обява без улица времената за показване са по нея;
     - "commutes": време с кола и с градски транспорт до всяка цел, по квартала (за оценката)
-      и по улицата (за показване); "commute" е първата цел, по нея е оценката;
+      и по улицата или спирката (за показване); "commute" е първата цел, по нея е оценката;
     - "location_warnings": съмнения от картата за тази обява.
 
     Връща общите бележки за търсенето (напр. "целта не е намерена"), за да се кажат веднъж.
@@ -37,6 +44,9 @@ def add_location_data(listings: list[dict], city: str, commute_to: str | list[st
     """
     notes = []
 
+    for listing in listings:
+        listing["location_warnings"] = []
+        _add_described_address(listing)
     stores_and_age = _load_chain_stores(city, notes)
     districts = _locate_districts(listings, city)
     streets = _locate_streets(listings, city, districts)
@@ -46,12 +56,13 @@ def add_location_data(listings: list[dict], city: str, commute_to: str | list[st
         stores, _ = stores_and_age
         chains_by_district = _chains_by_district(districts, stores)
 
-    listing_streets = []
+    listing_places = []
     for listing in listings:
         district = districts.get(listing.get("district"))
         street = streets.get((listing.get("street"), listing.get("district")))
         street = _add_place_warnings(listing, district, street)
-        listing_streets.append(street)
+        stop = _add_stop(listing, city, district, street)
+        listing_places.append(street or stop)
 
         if stores_and_age and district:
             stores, _ = stores_and_age
@@ -60,7 +71,7 @@ def add_location_data(listings: list[dict], city: str, commute_to: str | list[st
     targets = commute_targets(commute_to)
     labels = commute_labels(targets)
     for target in targets:
-        notes += _add_commute(listings, listing_streets, city, target, labels[target], districts)
+        notes += _add_commute(listings, listing_places, city, target, labels[target], districts)
 
     return notes
 
@@ -125,7 +136,8 @@ def _chains_by_district(districts: dict, stores: list) -> dict:
 
 
 def _add_place_warnings(listing: dict, district: dict | None, street: dict | None) -> dict | None:
-    listing["location_warnings"] = list(district["warnings"]) if district else []
+    if district:
+        listing["location_warnings"] += district["warnings"]
 
     if street and street.get("far_from_district"):
         listing["location_warnings"].append(
@@ -136,6 +148,56 @@ def _add_place_warnings(listing: dict, district: dict | None, street: dict | Non
     if street:
         listing["location_warnings"] += street["warnings"]
     return street
+
+
+def _add_described_address(listing: dict) -> None:
+    """Адресът с номер от описанието. Улицата от списъка е по-обща, затова при същата улица получава номера;
+    при друга улица остава тя, а разликата е предупреждение."""
+    found = addresses.find_addresses(listing.get("description"))
+    if not found:
+        return
+    address = found[0]
+    listing["address_from_description"] = address["text"]
+
+    street = listing.get("street")
+    same_street = street and addresses.street_words(street) == addresses.street_words(address["street"])
+    has_other_number = same_street and street not in (address["street"], address["text"])
+    has_no_number = address["text"] == address["street"]
+    if not street or (same_street and not has_other_number):
+        if not (street and has_no_number):
+            listing["street"] = address["text"]
+        return
+    if same_street and has_no_number:
+        return
+
+    listing["location_warnings"].append(
+        f"улицата от обявата е \"{street}\", а в описанието е \"{address['text']}\": "
+        "провери кое е вярно, мярката е по улицата от обявата"
+    )
+
+
+def _add_stop(listing: dict, city: str, district: dict | None, street: dict | None) -> dict | None:
+    """Спирката от описанието. Записва я в обявата и връща точката ѝ (None, ако няма или не е намерена)."""
+    mentions = stops.find_mentions(listing.get("description"))
+    if not mentions:
+        return None
+    listing["stop_mentions"] = [mention["text"] for mention in mentions]
+
+    # с улица спирката е само за показване и за проверка: бавната карта не е нужна
+    stop = stops.locate(mentions, city, district, use_map=street is None)
+    if stop is None:
+        return None
+    listing["stop"] = stop
+
+    if street:
+        km = common.distance_km(street, stop)
+        stated_m = stop.get("stated_m")
+        limit_km = max(MIN_KM_STREET_FROM_STOP, 2 * stated_m / 1000) if stated_m else MAX_KM_STREET_FROM_STOP
+        if km > limit_km:
+            listing["location_warnings"].append(
+                f"улицата е на {km:.1f} км от \"{stop['mention']}\" от описанието: провери адреса"
+            )
+    return stop
 
 
 def _add_chains(listing: dict, street: dict | None, stores: list, chains_by_district: dict) -> None:
@@ -150,7 +212,7 @@ def _add_chains(listing: dict, street: dict | None, stores: list, chains_by_dist
             listing["chain_near_street"] = nearest
 
 
-def _add_commute(listings, listing_streets, city, commute_to, label, districts) -> list[str]:
+def _add_commute(listings, listing_places, city, commute_to, label, districts) -> list[str]:
     """Време с кола и с градски транспорт до целта. Връща бележките за самата цел."""
     prefix = f"{label}: "
     target = geocode.locate_any(commute_to, city)
@@ -158,21 +220,19 @@ def _add_commute(listings, listing_streets, city, commute_to, label, districts) 
         return [f"{prefix}не успях да намеря \"{commute_to}\" в картата, затова няма време до него"]
 
     # оценката е винаги по квартала, за да се мерят всички обяви еднакво; улицата е само за показване
-    origins = _unique_points([*districts.values(), *listing_streets])
+    origins = _unique_points([*districts.values(), *listing_places])
     drive_routes = driving.drive_many(origins, target)
     routes_by_point = {common.point_key(origin): route for origin, route in zip(origins, drive_routes)}
     transit_by_point = _transit_routes(origins, target, city)
 
-    for listing, street in zip(listings, listing_streets):
+    for listing, place in zip(listings, listing_places):
         district = districts.get(listing.get("district"))
         district_route = routes_by_point.get(common.point_key(district)) if district else None
         if district_route is None:
             continue
 
-        if street:
-            shown_place, precision = street, "улица"
-        else:
-            shown_place, precision = district, "квартал"
+        shown_place = place or district
+        precision = PRECISION_BY_KIND.get(place.get("kind"), "улица") if place else "квартал"
         shown_point = common.point_key(shown_place)
         shown_route = routes_by_point.get(shown_point) or district_route
         shown_time = driving.city_drive_time(shown_route)

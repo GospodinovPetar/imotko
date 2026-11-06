@@ -8,7 +8,7 @@ from itertools import batched
 
 from imotko import store
 from imotko.geo import enrich
-from imotko.search import requirements, scoring
+from imotko.search import facts, requirements, scoring
 from imotko.sources import source
 
 MIN_LISTINGS_FOR_DISTRICT_MEDIAN = 5
@@ -96,6 +96,34 @@ def remove_duplicates(listings: list[dict]) -> list[dict]:
     return unique + cannot_compare
 
 
+def remove_duplicates_by_address(listings: list[dict]) -> list[dict]:
+    """Същият адрес, същата квадратура и етаж са един имот, дори да е качен от няколко агенции.
+
+    След търсенето в описанията адресът е по-силен ключ от квартала. Остава най-евтината обява.
+    Броячите на дубликатите се събират с тези от първото премахване (remove_duplicates).
+    """
+    same_property: dict[tuple, list[dict]] = {}
+    rest = []
+    for listing in listings:
+        address = listing.get("address_from_description")
+        if not address or listing["area_m2"] is None or listing["floor"] is None:
+            rest.append(listing)
+            continue
+        key = (address.lower(), round(listing["area_m2"]), listing["floor"])
+        same_property.setdefault(key, []).append(listing)
+
+    unique = []
+    for copies in same_property.values():
+        cheapest = min(copies, key=lambda copy: copy["price_eur"])
+        others = [copy for copy in copies if copy is not cheapest]
+        if others:
+            cheapest["duplicates"] = cheapest.get("duplicates", 0) + sum(1 + copy.get("duplicates", 0) for copy in others)
+            prices = [copy.get("duplicates_max_price", copy["price_eur"]) for copy in copies]
+            cheapest["duplicates_max_price"] = max(prices)
+        unique.append(cheapest)
+    return unique + rest
+
+
 def _passes_basic_filters(listing: dict, filters: dict) -> bool:
     """Филтрите, които се проверяват още от списъка с обяви."""
     return requirements.passes(requirements.list_page_checks(listing, filters))
@@ -165,9 +193,13 @@ def run_search(
     # Детайлна проверка на най-обещаващите
     matching, detail_checked = _check_details(candidates, filters, top, order_by)
 
+    for listing in matching:
+        listing["description_facts"] = facts.find_facts(listing.get("description"))
+
     #  Място: квартал, улица, магазини, време до целта (с кеш; при грешка обявите остават без тях)
     notes = _unmatched_district_notes(listings, filters)
     notes += _add_location_data(matching, city, commute_to)
+    matching = remove_duplicates_by_address(matching)
 
     # Окончателна оценка с всички данни
     for listing in matching:

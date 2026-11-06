@@ -11,6 +11,7 @@
 """
 
 import csv
+import functools
 import io
 import math
 import statistics
@@ -275,6 +276,44 @@ def read_stops(feed: zipfile.ZipFile) -> tuple[dict[str, int], list[dict]]:
         stop_index_by_id[row["stop_id"]] = len(stops)
         stops.append({"lat": float(row["stop_lat"]), "lon": float(row["stop_lon"]), "name": row.get("stop_name", "")})
     return stop_index_by_id, stops
+
+
+def named_stops(city: str) -> list[dict]:
+    """Спирките и станциите на града: {"name", "lat", "lon", "is_station"}.
+
+    Чете само stops.txt от вече сваления файл (не сваля нищо). Празен списък, ако файлът липсва.
+    """
+    path = feed_path(city)
+    try:
+        return _read_named_stops(path, path.stat().st_mtime)
+    except OSError:
+        return []
+
+
+@functools.lru_cache(maxsize=16)
+def _read_named_stops(path: Path, modified: float) -> list[dict]:
+    """Прочетените спирки на файла; новата дата на файла води до ново четене."""
+    try:
+        with zipfile.ZipFile(path) as feed:
+            return read_named_stops(feed)
+    except (OSError, zipfile.BadZipFile, ValueError):
+        return []
+
+
+def read_named_stops(feed: zipfile.ZipFile) -> list[dict]:
+    stops = []
+    for row in read_csv(feed, "stops.txt"):
+        location_type = row.get("location_type") or "0"
+        is_stop_or_station = location_type in ("0", "1")  # 2 са входовете на метростанциите
+        if not is_stop_or_station or not row.get("stop_lat") or not row.get("stop_name"):
+            continue
+        stops.append({
+            "name": row["stop_name"].strip(),
+            "lat": float(row["stop_lat"]),
+            "lon": float(row["stop_lon"]),
+            "is_station": location_type == "1",
+        })
+    return stops
 
 
 def read_stop_visits(feed: zipfile.ZipFile, trip_index_by_id: dict[str, int],

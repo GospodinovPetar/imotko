@@ -434,7 +434,7 @@ def parse_detail(html: str) -> dict:
     # "Особености" са подредени белези; описанието е свободен текст
     feature_items = [item.get_text(strip=True) for item in page.select("div.carExtri div.items div")]
     features = ", ".join(feature_items)
-    description = _text_of(page, "div.moreInfo div.text")
+    description = " ".join(_text_of(page, "div.moreInfo div.text").split())
 
     all_text = f"{params} {features} {description}".lower()
 
@@ -453,6 +453,7 @@ def parse_detail(html: str) -> dict:
         "has_parking": is_mentioned(all_text, r"паркинг|гараж|паркомясто"),
         "furnished": is_mentioned(all_text, r"\bобзаведен|с обзавеждане"),
         "has_terrace": is_mentioned(all_text, r"тераса|(?<!френски )балкон"),
+        "description": description,
         "photos": listing_photos(html),
     }
 

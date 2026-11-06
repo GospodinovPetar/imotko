@@ -2,7 +2,7 @@
 
 from urllib.parse import quote_plus
 
-from imotko.geo import transit
+from imotko.geo import stops, transit
 from imotko.search import requirements, scan, scoring
 from imotko.sources import source
 
@@ -76,7 +76,7 @@ def _format_listing(number: int, listing: dict, deal: str, filters: dict | None 
     )
     reasons_text = "; ".join(listing["reasons"]) or "-"
 
-    lines = [first_line, _details_line(listing)]
+    lines = [first_line, *_address_lines(listing), _details_line(listing), *_facts_lines(listing)]
     conditions_line = _conditions_line(listing, filters or {})
     if conditions_line:
         lines.append(conditions_line)
@@ -88,6 +88,25 @@ def _format_listing(number: int, listing: dict, deal: str, filters: dict | None 
     lines.append(f"   {listing['url']}")
     lines.append(f"   карта: {_map_link(listing)}")
     return "\n".join(lines)
+
+
+def _address_lines(listing: dict) -> list[str]:
+    """Адресът, който търсенето е намерило в описанието, и по кой адрес са мерките."""
+    address = listing.get("address_from_description")
+    if not address:
+        return []
+
+    if listing.get("street") != address:
+        return [f"   адрес от описанието: {address} - различава се от улицата от обявата, мерките са по нея"]
+    return [f"   адрес от описанието: {address} (написан в текста на обявата; мерките до местата са по него)"]
+
+
+def _facts_lines(listing: dict) -> list[str]:
+    """Отоплението, комисионната и другото, което изрично пише в описанието (само ако е намерено)."""
+    facts = listing.get("description_facts")
+    if not facts:
+        return []
+    return [f"   от описанието: {'; '.join(facts)}"]
 
 
 def _address_text(listing: dict) -> str:
@@ -162,10 +181,28 @@ def _place_lines(listing: dict) -> list[str]:
         chain, distance_km = chain_near_street
         lines.append(f"   най-близо до улицата: {chain} ~{distance_km * 1000:.0f} м (по улица)")
 
-    for commute in _commutes_of(listing):
+    commutes = _commutes_of(listing)
+    lines += _stop_lines(listing, commutes)
+    for commute in commutes:
         lines.append(_commute_line(commute))
 
     return lines
+
+
+def _stop_lines(listing: dict, commutes: list[dict]) -> list[str]:
+    """Спирката или метростанцията, написана в описанието, и дали времената са по нея."""
+    stop = listing.get("stop")
+    if stop:
+        stated = f", по описанието на {stop['stated_text']}" if stop.get("stated_text") else ""
+        line = f"   спирка от описанието: {stop['mention']}{stated} (намерена в {stop['source']} като \"{stop['name']}\")"
+        if any(commute["precision"] == stops.PRECISION for commute in commutes):
+            line += "; времената по-долу са от нея, не от адреса на жилището"
+        return [line]
+
+    mentions = listing.get("stop_mentions")
+    if mentions:
+        return [f"   спирка от описанието: {', '.join(mentions)} - не е намерена в картата, времената не са по нея"]
+    return []
 
 
 def _chains_line(chains: dict) -> str:
