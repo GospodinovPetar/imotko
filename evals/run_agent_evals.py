@@ -62,7 +62,7 @@ def main() -> int:
         passed += ok
         print(f"{'✓' if ok else '✗'} {case['question']}")
         for problem in problems:
-            print(f"    - {problem}")
+            print(f" - {problem}")
 
     print(f"\n{passed} от {len(cases)} минават.")
     return 0 if passed == len(cases) else 1

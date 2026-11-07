@@ -90,7 +90,7 @@ def _found_places_lines(found: dict) -> list[str]:
             continue
         lines.append(f"{name}: {place['name'][:90]} (точност: {geocode.precision_text(place)})")
         for warning in place["warnings"]:
-            lines.append(f"   ⚠ {warning}")
+            lines.append(f" ⚠ {warning}")
     return lines
 
 
