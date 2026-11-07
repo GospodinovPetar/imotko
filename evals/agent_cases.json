@@ -21,6 +21,11 @@
       "question": "Търся двустаен под наем в София до 600 евро, с тераса, над 60 кв.м. Покажи ми 3.",
       "expected_tools": ["search_apartments"],
       "must_mention_any": ["imot.bg"]
+    },
+    {
+      "question": "На кой адрес е тази обява и какво е включено в цената? https://www.imot.bg/obiava-2c179320133141979-dava-pod-naem-dvustaen-apartament-grad-sofiya-manastirski-livadi",
+      "expected_tools": ["read_description"],
+      "must_mention_any": ["Българска легия"]
     }
   ]
 }

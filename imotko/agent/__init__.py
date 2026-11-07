@@ -15,6 +15,7 @@ TOOLS = [
     tools.search_apartments,
     tools.compare_districts,
     tools.distance_between,
+    tools.read_description,
     tools.report_error,
     vision.analyze_photos,
     tools.list_saved_searches,

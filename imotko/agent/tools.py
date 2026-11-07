@@ -5,11 +5,13 @@ import json
 from agno.run import RunContext
 
 from imotko import store
-from imotko.geo import distance, driving, geocode
+from imotko.geo import addresses, distance, driving, geocode, stops
 from imotko.search import formatting, saved, scan
+from imotko.sources import source
 
 # Повече обяви правят отговора на инструмента огромен и моделът не успява да отговори.
 MAX_TOP = 15
+MAX_DESCRIPTION_CHARS = 4000
 
 
 # Търсенията, вече направени в даден отговор (run_id -> заявка -> id-тата на показаните обяви).
@@ -156,6 +158,37 @@ def search_apartments(
     if save_as:
         text += "\n\n" + _save_search(save_as, query, shown_ids)
     return text
+
+
+def read_description(listing_url: str) -> str:
+    """Връща пълния текст от описанието на обява, заедно с адреса и спирките, които са написани в него.
+
+    Ползвай я, когато потребителят пита за нещо от текста на обявата (какво е включено в цената, отопление,
+    условия, адрес) или каже, че в описанието има нещо, което го няма в резултатите от търсенето.
+
+    Args:
+        listing_url: Пълният линк към обявата от резултатите на search_apartments.
+    """
+    if not source.listing_id(listing_url):
+        return "Нужен е пълен линк към обява от imot.bg (https://www.imot.bg/obiava-...)."
+
+    listing = {"url": listing_url}
+    source.add_details([listing])
+    description = listing.get("description")
+    if not description:
+        return "Не успях да чета описанието на тази обява (не се зарежда или е празно). Не казвай какво пише в него."
+
+    found_addresses = [address["text"] for address in addresses.find_addresses(description)]
+    found_stops = [mention["text"] for mention in stops.find_mentions(description)]
+    text = description
+    if len(text) > MAX_DESCRIPTION_CHARS:
+        text = text[:MAX_DESCRIPTION_CHARS] + "... (текстът е съкратен)"
+    return (
+        f"Описание на {listing_url}\n"
+        f"Адрес с номер в текста: {'; '.join(found_addresses) or 'няма'}\n"
+        f"Спирки и метростанции в текста: {'; '.join(found_stops) or 'няма'}\n"
+        f"Текст: {text}"
+    )
 
 
 def compare_districts(city: str, rooms: str, deal: str = "продажба", pages: int = 3) -> str:
