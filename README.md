@@ -838,6 +838,7 @@ uvx ruff@0.17.3 check --select F imotko tests evals watch.py app.py chat.py
 
 - **Tests** (over 200) need no network and no API keys: imot.bg, the map services and the models are mocked. HTML fixtures are in `tests/fixtures/`. Areas covered include parsing, filters and scoring, geocoding, the transit router, stop and address extraction, facts, monitoring and the quality checks.
 - **CI** ([`.github/workflows/tests.yml`](.github/workflows/tests.yml)) runs lint and tests on every push to `main` and every pull request, and verifies that the Docker image builds (with layer caching).
+- **imot.bg check** ([`.github/workflows/site-check.yml`](.github/workflows/site-check.yml)) runs every day: it downloads one real list page and three listings and fails if the parser no longer reads them, so a change in imot.bg's HTML shows up as a failed run and an email from GitHub. Run it locally with `uv run python -m imotko.quality.site_check`.
 
 ### Extending
 

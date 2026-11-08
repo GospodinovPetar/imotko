@@ -11,6 +11,7 @@ from agno.exceptions import ModelProviderError
 
 from imotko import models, notify
 from imotko import store as st
+from imotko.quality import site_check
 from imotko.search import formatting, requirements, saved, scan, scoring
 from imotko.sources import imot_bg as sc
 from tests.helpers import TempDatabase
@@ -439,3 +440,21 @@ class Requirements(unittest.TestCase):
         self.assertEqual(list(labels.values()), ["SAP Labs Bulgaria", "бул. Цар Борис III 81"])
         same = enrich.commute_labels(["Бизнес парк, сграда 1", "Бизнес парк, сграда 7"])
         self.assertEqual(list(same.values()), ["Бизнес парк, сграда 1", "Бизнес парк, сграда 7"])
+
+
+class SiteCheck(unittest.TestCase):
+    """Записаните страници минават; празна страница или страница без описание са сигнал за сменен HTML."""
+
+    def test_saved_pages_pass(self):
+        self.assertEqual(site_check.problems(listing_items(), [], [detail()]), [])
+
+    def test_changed_list_page_is_reported(self):
+        empty_page = sc.parse_listing_page("<html><body><div class='new-layout'></div></body></html>")
+        self.assertIn("само 0 обяви", site_check.problems(empty_page, [], [detail()])[0])
+
+    def test_changed_listing_page_is_reported(self):
+        no_description = dict(detail(), description="")
+        self.assertIn("description", " ".join(site_check.problems(listing_items(), [], [no_description])))
+
+    def test_site_down_is_not_called_a_html_change(self):
+        self.assertIn("не отговаря", site_check.problems([], ["https://www.imot.bg/...: 503"], [])[0])

@@ -1,0 +1,29 @@
+name: imot.bg check
+
+# Всеки ден сваля истински страници от imot.bg и проверява, че парсерът още ги чете.
+# При грешка GitHub праща имейл на човека, който последно е променил този график.
+on:
+  schedule:
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  site-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: Check that imot.bg pages still parse
+        run: uv run python -m imotko.quality.site_check
