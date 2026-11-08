@@ -155,7 +155,11 @@ def format_feedback(limit: int = 20) -> str:
             lines.append(f"- поправка: {record['question'][:80]} -> {record['correction'][:80]}")
         else:
             numbers = ", ".join(record["data"].get("numbers", []))
-            lines.append(f"- непроверени числа ({numbers}) във въпрос: {record['question'][:80]}")
+            models = ", ".join(record["data"].get("models", [])) or "?"
+            version = record["data"].get("version", "?")
+            lines.append(
+                f"- непроверени числа ({numbers}) от {models}, imotko {version}, във въпрос: {record['question'][:80]}"
+            )
     return "\n".join(lines)
 
 

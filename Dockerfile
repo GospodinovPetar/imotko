@@ -17,7 +17,7 @@ WORKDIR /app
 RUN useradd --create-home --uid 1000 imotko
 
 COPY --from=build /app/.venv ./.venv
-COPY app.py chat.py watch.py ./
+COPY app.py chat.py watch.py pyproject.toml ./
 COPY imotko/ ./imotko/
 
 ENV PATH="/app/.venv/bin:$PATH" \

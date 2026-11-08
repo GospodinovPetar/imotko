@@ -138,6 +138,13 @@ def suspicious_numbers(run_output, session=None) -> list[str]:
     return unverified_numbers(answer_without_warning, sources)
 
 
+def _models_used(run_output) -> list[str]:
+    """Моделите, които реално са отговорили. run_output.model е винаги основният, дори ако е отговорил резервният."""
+    details = getattr(getattr(run_output, "metrics", None), "details", None) or {}
+    used = [model.id for model in details.get("model", [])]
+    return used or [getattr(run_output, "model", None) or "?"]
+
+
 def check_answer(run_output, session=None) -> None:
     """post_hook за агента. Никога не спира отговора, дори ако самата проверка се счупи."""
     try:
@@ -152,7 +159,7 @@ def check_answer(run_output, session=None) -> None:
             "unverified_numbers",
             question=question[:2000],
             answer=answer[:4000],
-            data={"numbers": suspicious, "tools": tool_names},
+            data={"numbers": suspicious, "tools": tool_names, "models": _models_used(run_output)},
         )
         run_output.content = answer + (
             f"{WARNING_MARKER} числата {', '.join(suspicious)} не идват директно от инструментите "

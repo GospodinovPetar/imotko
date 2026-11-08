@@ -1,6 +1,7 @@
 """Настройките на проекта на едно място: .env, папка за данните и моделите."""
 
 import os
+import tomllib
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -8,6 +9,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+# версията на imotko, за да се знае коя версия е дала даден отговор (Dockerfile копира pyproject.toml)
+VERSION = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text())["project"]["version"]
 
 # IMOT_DATA_DIR позволява базите да са извън кода (напр. volume в Docker)
 DATA_DIR = Path(os.getenv("IMOT_DATA_DIR", PROJECT_ROOT))

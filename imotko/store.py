@@ -7,7 +7,7 @@ import time
 from contextlib import closing
 from itertools import batched
 
-from imotko.config import DATA_DIR
+from imotko.config import DATA_DIR, VERSION
 
 DB_PATH = DATA_DIR / "imot_history.db"
 
@@ -209,7 +209,7 @@ def add_feedback(kind: str, question: str = "", answer: str = "", correction: st
     with closing(_connect()) as connection, connection:
         connection.execute(
             "INSERT INTO feedback (ts, kind, question, answer, correction, data) VALUES (?, ?, ?, ?, ?, ?)",
-            (time.time(), kind, question, answer, correction, json.dumps(data or {}, ensure_ascii=False)),
+            (time.time(), kind, question, answer, correction, json.dumps({**(data or {}), "version": VERSION}, ensure_ascii=False)),
         )
 
 

@@ -697,7 +697,7 @@ uv run python -m imotko.quality.checks
 - It extracts the numbers from the answer (ignoring links), including thousands separators (`117 000`, `117,000`) and decimals.
 - A number is accepted if it appears in a tool result from this answer or the last 3 runs, or in the user's question, with a tolerance of 3% (at least 1) for rounding. Numbers up to 10 are ignored.
 - A number next to a calculation word ("разлика", "общо", "по-евтин", "+") is accepted if it equals the sum or difference of two known numbers.
-- Otherwise the answer gets a `⚠ Проверка:` note listing the unverified numbers, and the answer, the question and the tools called are saved to the `feedback` table (`unverified_numbers`).
+- Otherwise the answer gets a `⚠ Проверка:` note listing the unverified numbers, and the answer, the question, the tools called, the model that actually answered (the fallback, if it was used) and the Imotko version are saved to the `feedback` table (`unverified_numbers`). `uv run python -m imotko.quality.checks` lists the latest records with their model and version.
 - It never blocks an answer. In the streamed web UI the note may not be visible, but the record is always written.
 
 ### 3. Sample questions against the real model

@@ -7,7 +7,7 @@ from types import SimpleNamespace
 from unittest import mock
 
 import watch
-from imotko import store
+from imotko import config, store
 from imotko.agent import hooks, tools
 from imotko.geo import common, driving, geocode
 from imotko.quality import checks, monitoring
@@ -56,6 +56,16 @@ class CheckAnswer(TempDatabase):
         saved = store.list_feedback("unverified_numbers")
         self.assertEqual(saved[0]["data"]["numbers"], ["35"])
         self.assertEqual(saved[0]["question"], "Колко е до УНСС?")
+
+    def test_saves_the_model_that_answered_and_the_version(self):
+        run = fake_run("До УНСС е 35 мин.", ["~19 мин"])
+        run.model = "main-model"  # agno пише основния модел дори когато е отговорил резервният
+        run.metrics = SimpleNamespace(details={"model": [SimpleNamespace(id="fallback-model")]})
+        monitoring.check_answer(run)
+        data = store.list_feedback("unverified_numbers")[0]["data"]
+        self.assertEqual(data["models"], ["fallback-model"])
+        self.assertEqual(data["version"], config.VERSION)
+        self.assertIn(f"от fallback-model, imotko {config.VERSION}", checks.format_feedback())
 
     def test_verified_answer_is_untouched(self):
         run = fake_run("До УНСС е ~19 мин.", ["С кола: ~19 мин, 5.7 км"])
@@ -126,7 +136,7 @@ class CityDriveTime(TempDatabase):
         ):
             text = tools.report_error("10 мин", "2 мин", "Лозенец", "Бизнес парк София", 2)
         self.assertIn("не приличат", text)
-        self.assertEqual(store.list_feedback("user_report")[0]["data"], {})
+        self.assertNotIn("real_minutes", store.list_feedback("user_report")[0]["data"])
 
     def test_correction_without_route_is_still_saved(self):
         text = tools.report_error("грешен квартал", "Лозенец")
