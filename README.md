@@ -231,7 +231,7 @@ evals/                        sample questions run against the real model
 | **ntfy.sh** | Phone notifications | `NtfyNotifier` posts JSON to a topic. | `imotko/notify.py` |
 | **uv** | Environment | Python 3.14 and locked dependencies (`uv.lock`). | `pyproject.toml` |
 | **Docker + Compose** | Deployment | Multi-stage image pinned by digest, non-root user, healthcheck, log rotation. Two services: the agent and the watcher. | `Dockerfile`, `compose.yaml` |
-| **GitHub Actions** | CI | Lint (ruff, rule set `F`), unit tests, Docker build with layer cache. | `.github/workflows/tests.yml` |
+| **GitHub Actions** | CI/CD | Lint (ruff, rule set `F`), unit tests, Docker build with layer cache; on a `v*` tag, publishes the image to GHCR. Scheduled imot.bg, tool and agent checks. | `.github/workflows/` |
 | **unittest** | Tests | Over 200 tests across 7 modules; all network, map and model calls are mocked. | `tests/` |
 
 ---
@@ -846,6 +846,7 @@ uvx ruff@0.17.3 check --select F imotko tests evals watch.py app.py chat.py
 - **CI** ([`.github/workflows/tests.yml`](.github/workflows/tests.yml)) runs lint and tests on every push to `main` and every pull request, and verifies that the Docker image builds (with layer caching).
 - **Release:** set `version` in `pyproject.toml`, then push a tag `v<version>`. The same workflow tests it and publishes `ghcr.io/gospodinovpetar/imotko` with the tags `<version>`, `<major>.<minor>` and `latest`. It fails if the tag and `pyproject.toml` disagree.
 - **imot.bg check** ([`.github/workflows/site-check.yml`](.github/workflows/site-check.yml)) runs every day: it downloads one real list page and three listings and fails if the parser no longer reads them, so a change in imot.bg's HTML shows up as a failed run and an email from GitHub. Run it locally with `uv run python -m imotko.quality.site_check`.
+- **Quality** ([`.github/workflows/quality.yml`](.github/workflows/quality.yml)) runs every Monday: the tool checks against `ground_truth.json` and the agent evals against the real model. It needs the repository secret `OPENROUTER_API_KEY`.
 
 ### Extending
 
