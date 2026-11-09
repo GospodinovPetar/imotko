@@ -824,6 +824,12 @@ docker compose logs -f imotko              # logs (or: watch)
 docker compose down                        # stop; data is kept
 ```
 
+Every release tag (`v1.2.3`) also publishes a ready image, so a server can skip the build:
+
+```bash
+docker pull ghcr.io/gospodinovpetar/imotko:1.2.3   # or :1.2, :latest
+```
+
 If you expose the server to the internet, do not publish port 7777 without protection (a reverse proxy with authentication, or a VPN).
 
 ---
@@ -838,6 +844,7 @@ uvx ruff@0.17.3 check --select F imotko tests evals watch.py app.py chat.py
 
 - **Tests** (over 200) need no network and no API keys: imot.bg, the map services and the models are mocked. HTML fixtures are in `tests/fixtures/`. Areas covered include parsing, filters and scoring, geocoding, the transit router, stop and address extraction, facts, monitoring and the quality checks.
 - **CI** ([`.github/workflows/tests.yml`](.github/workflows/tests.yml)) runs lint and tests on every push to `main` and every pull request, and verifies that the Docker image builds (with layer caching).
+- **Release:** set `version` in `pyproject.toml`, then push a tag `v<version>`. The same workflow tests it and publishes `ghcr.io/gospodinovpetar/imotko` with the tags `<version>`, `<major>.<minor>` and `latest`. It fails if the tag and `pyproject.toml` disagree.
 - **imot.bg check** ([`.github/workflows/site-check.yml`](.github/workflows/site-check.yml)) runs every day: it downloads one real list page and three listings and fails if the parser no longer reads them, so a change in imot.bg's HTML shows up as a failed run and an email from GitHub. Run it locally with `uv run python -m imotko.quality.site_check`.
 
 ### Extending
