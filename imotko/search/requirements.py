@@ -4,6 +4,7 @@
 за да не може моделът да каже "отговаря", когато филтърът е пуснал обявата по друга причина.
 """
 
+import re
 from dataclasses import dataclass
 
 from imotko.search import scoring
@@ -31,9 +32,10 @@ def district_names(filters: dict, key: str) -> list[str]:
     return [name.strip() for name in value if name and name.strip()]
 
 
-def _in_district(listing: dict, name: str) -> bool:
-    # само по местоположението: в описанието е и улицата ("бул. Витоша" не е квартал Витоша)
-    return name.lower() in listing["location"].lower()
+def in_district(listing: dict, name: str) -> bool:
+    # само по местоположението: в описанието е и улицата ("бул. Витоша" не е квартал Витоша);
+    # цели думи: "Люлин 1" не е "Люлин 10"
+    return re.search(rf"(?<!\w){re.escape(name)}(?!\w)", listing["location"], re.IGNORECASE) is not None
 
 
 def _price_check(listing: dict, filters: dict, details_known: bool) -> Check | None:
@@ -84,14 +86,14 @@ def _district_checks(listing: dict, filters: dict) -> list[Check]:
 
     wanted = district_names(filters, "district")
     if wanted:
-        matching = [name for name in wanted if _in_district(listing, name)]
+        matching = [name for name in wanted if in_district(listing, name)]
         if matching:
             checks.append(Check(OK, f"квартал {matching[0]}"))
         else:
             checks.append(Check(FAILED, f"квартал извън избраните ({listing['location']})"))
 
     for name in district_names(filters, "exclude_districts"):
-        if _in_district(listing, name):
+        if in_district(listing, name):
             checks.append(Check(FAILED, f"квартал {name} е изключен"))
 
     return checks

@@ -11,7 +11,7 @@ from agno.exceptions import ModelProviderError
 
 from imotko import models, notify
 from imotko import store as st
-from imotko.search import formatting, saved, scan, scoring
+from imotko.search import formatting, requirements, saved, scan, scoring
 from imotko.sources import imot_bg as sc
 from tests.helpers import TempDatabase
 
@@ -182,6 +182,17 @@ class Scoring(unittest.TestCase):
         self.assertEqual(len(out), 1)
         self.assertEqual(out[0]["id"], "b")
         self.assertEqual(out[0]["duplicates"], 1)
+
+    def test_dedupe_keeps_far_prices_apart(self):
+        # еднакви панелни блокове: същите квартал, квадратура и етаж, но различни жилища
+        a = dict(self.base, district="Дружба 2", id="a", price_eur=171900)
+        b = dict(self.base, district="Дружба 2", id="b", price_eur=219800)
+        self.assertEqual({listing["id"] for listing in scan.remove_duplicates([a, b])}, {"a", "b"})
+
+    def test_district_matches_whole_name_only(self):
+        lyulin_10 = {"location": "град София, Люлин 10"}
+        self.assertFalse(requirements.in_district(lyulin_10, "Люлин 1"))
+        self.assertTrue(requirements.in_district(lyulin_10, "люлин 10"))
 
     def test_format_price_per_m2(self):
         self.assertEqual(formatting.format_price_per_m2(1461.04, "продажба"), "1461")

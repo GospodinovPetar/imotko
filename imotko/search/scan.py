@@ -13,6 +13,9 @@ from imotko.sources import source
 
 MIN_LISTINGS_FOR_DISTRICT_MEDIAN = 5
 
+# в еднакви панелни блокове има много жилища с еднакви квадратура и етаж: един имот са само при близки цени
+SAME_PROPERTY_MAX_PRICE_RATIO = 1.2
+
 MAX_DETAIL_CHECKS = 25  # толкова обяви най-много проверяваме в детайли (по една заявка на обява)
 
 FILTERS = {
@@ -73,7 +76,8 @@ def median_prices(listings: list[dict]) -> tuple[float, dict[str, float]]:
 def remove_duplicates(listings: list[dict]) -> list[dict]:
     """Един имот често е качен от няколко агенции. Оставяме обявата с най-ниската цена.
 
-    Еднакви са обявите в същия квартал, със същата квадратура и на същия етаж.
+    Еднакви са обявите в същия квартал, със същата квадратура и на същия етаж,
+    чиято цена е до SAME_PROPERTY_MAX_PRICE_RATIO пъти най-ниската.
     """
     same_property: dict[tuple, list[dict]] = {}
     cannot_compare = []
@@ -87,11 +91,15 @@ def remove_duplicates(listings: list[dict]) -> list[dict]:
 
     unique = []
     for copies in same_property.values():
-        prices = [copy["price_eur"] for copy in copies]
-        cheapest = min(copies, key=lambda copy: copy["price_eur"])
-        cheapest["duplicates"] = len(copies) - 1
-        cheapest["duplicates_max_price"] = max(prices)
-        unique.append(cheapest)
+        copies.sort(key=lambda copy: copy["price_eur"])
+        while copies:
+            cheapest = copies[0]
+            limit = cheapest["price_eur"] * SAME_PROPERTY_MAX_PRICE_RATIO
+            same = [copy for copy in copies if copy["price_eur"] <= limit]
+            copies = copies[len(same):]
+            cheapest["duplicates"] = len(same) - 1
+            cheapest["duplicates_max_price"] = same[-1]["price_eur"]
+            unique.append(cheapest)
 
     return unique + cannot_compare
 
@@ -138,7 +146,7 @@ def _unmatched_district_notes(listings: list[dict], filters: dict) -> list[str]:
     """Квартал, който не съвпада с нито една обява, обикновено е написан различно от imot.bg."""
     notes = []
     for name in requirements.district_names(filters, "district"):
-        is_found = any(name.lower() in listing["location"].lower() for listing in listings)
+        is_found = any(requirements.in_district(listing, name) for listing in listings)
         if not is_found:
             notes.append(f"кварталът \"{name}\" не съвпада с нито една обява (може да е написан различно в imot.bg)")
     return notes
