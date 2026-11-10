@@ -171,14 +171,33 @@ class ToolChecks(TempDatabase):
 
 
 class WeeklyChecks(TempDatabase):
+    FAILING = [{"check": "път", "ok": False, "details": "~9 мин (реално 20)"}]
+
+    def run_watch(self, notifier):
+        with (
+            mock.patch.object(checks, "run_checks", return_value=self.FAILING) as run_checks,
+            mock.patch.object(watch, "refresh_chain_stores"),
+            mock.patch.object(watch.transit, "refresh_feeds", return_value=[]),
+            mock.patch.object(watch.saved, "check_saved_searches", return_value=[]),
+            mock.patch.object(watch, "default_notifier", return_value=notifier),
+        ):
+            try:
+                watch.main()
+            except RuntimeError:
+                pass
+        return run_checks.call_count
+
     def test_runs_once_a_week_and_reports_failures(self):
-        failing = [{"check": "път", "ok": False, "details": "~9 мин (реално 20)"}]
-        with mock.patch.object(checks, "run_checks", return_value=failing) as run_checks:
-            first = watch.weekly_tool_checks()
-            second = watch.weekly_tool_checks()
-        self.assertEqual(run_checks.call_count, 1)
-        self.assertIn("неверни данни", first[0])
-        self.assertEqual(second, [])
+        notifier = mock.Mock()
+        self.assertEqual(self.run_watch(notifier) + self.run_watch(notifier), 1)
+        self.assertIn("неверни данни", notifier.notify.call_args_list[0].args[0][0])
+
+    def test_check_runs_again_when_alert_was_not_delivered(self):
+        broken = mock.Mock()
+        broken.notify.side_effect = RuntimeError("ntfy не отговаря")
+        self.assertEqual(self.run_watch(broken), 1)
+        self.assertIsNone(store.get_place(watch.LAST_CHECK_KEY))
+        self.assertEqual(self.run_watch(mock.Mock()), 1)
 
     def test_nothing_to_send_when_all_ok(self):
         with mock.patch.object(checks, "run_checks", return_value=[{"check": "x", "ok": True, "details": ""}]):

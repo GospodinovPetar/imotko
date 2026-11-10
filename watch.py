@@ -15,6 +15,7 @@ from imotko.quality import checks
 from imotko.search import saved
 
 CHECKS_EVERY_SECONDS = 7 * 86400
+LAST_CHECK_KEY = "checks|last_run"
 
 
 def refresh_chain_stores() -> None:
@@ -34,16 +35,17 @@ def refresh_chain_stores() -> None:
             print(f"Магазини в {city}: Overpass не отговори, ще опитам пак.")
 
 
-def weekly_tool_checks() -> list[str]:
-    """Проверка на инструментите срещу проверените факти, веднъж седмично. Връща текст само при грешка."""
-    last_run = store.get_place("checks|last_run")
+def weekly_tool_checks() -> list[str] | None:
+    """Проверка на инструментите срещу проверените факти, веднъж седмично. Връща текст само при грешка,
+    None, ако още не е време. main я отбелязва като пусната чак след доставката.
+    """
+    last_run = store.get_place(LAST_CHECK_KEY)
     if last_run is not None:
         _, seconds_since_last_run = last_run
         if seconds_since_last_run < CHECKS_EVERY_SECONDS:
-            return []
+            return None
 
     results = checks.run_checks()
-    store.save_place("checks|last_run", {"found": True})
     report = checks.format_report(results)
     print(report)
 
@@ -63,18 +65,20 @@ def run_safely(task, fallback):
 def main() -> None:
     run_safely(refresh_chain_stores, None)
     run_safely(transit.refresh_feeds, [])
-    check_texts = run_safely(weekly_tool_checks, [])
+    check_texts = run_safely(weekly_tool_checks, None)
     reports = saved.check_saved_searches()
     report_texts = [report["text"] for report in reports]
-    texts = check_texts + report_texts
+    texts = (check_texts or []) + report_texts
 
     print("\n\n".join(texts) or "Няма нови обяви.")
     notifier = default_notifier()
     if notifier:
         notifier.notify(texts)
 
-    # чак след успешна доставка, иначе при грешка обявите биха се изгубили
+    # чак след успешна доставка, иначе при грешка обявите и сигналът от проверката биха се изгубили
     saved.mark_as_delivered(reports)
+    if check_texts is not None:
+        store.save_place(LAST_CHECK_KEY, {"found": True})
 
 
 if __name__ == "__main__":
