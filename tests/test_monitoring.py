@@ -1,13 +1,15 @@
 """Тестове за следенето на отговорите, калибрирането на времето и проверките. Без мрежа."""
 
+import tempfile
 import unittest
+from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
 
 import watch
 from imotko import store
 from imotko.agent import hooks, tools
-from imotko.geo import driving, geocode
+from imotko.geo import common, driving, geocode
 from imotko.quality import checks, monitoring
 from tests.helpers import TempDatabase
 
@@ -182,6 +184,18 @@ class WeeklyChecks(TempDatabase):
         with mock.patch.object(checks, "run_checks", return_value=[{"check": "x", "ok": True, "details": ""}]):
             self.assertEqual(watch.weekly_tool_checks(), [])
 
+
+
+class SharedRateLimit(unittest.TestCase):
+    def test_second_process_waits_for_the_first(self):
+        with (
+            tempfile.TemporaryDirectory() as folder,
+            mock.patch.object(common, "DATA_DIR", Path(folder)),
+            mock.patch.object(common.time, "sleep") as sleep,
+        ):
+            common.RateLimiter(1.1, "test").wait()
+            common.RateLimiter(1.1, "test").wait()  # друг процес: свой обект, същият файл
+        self.assertEqual(sleep.call_count, 1)
 
 
 class RepeatedSearch(unittest.TestCase):

@@ -46,7 +46,7 @@ HOUSE_NUMBER = re.compile(r"\s+(\d+)\s*[а-яa-z]?\s*$", re.IGNORECASE)
 HOUSE_NUMBER_PART = re.compile(r"\d+[а-яa-z]?(?:\s*[-–]\s*\d+[а-яa-z]?)?", re.IGNORECASE)
 DISTRICT_PREFIX = re.compile(r"^\s*(?:с\.|село|гр\.|ж\.?\s*к\.?|кв\.)\s*", re.IGNORECASE)
 
-_nominatim_limit = common.RateLimiter(1.1)
+_nominatim_limit = common.RateLimiter(1.1, "nominatim")
 
 
 def _nominatim(params: dict) -> list[dict]:

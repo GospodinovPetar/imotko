@@ -1,10 +1,11 @@
 """Общото за картата: заглавка към услугите, ограничение на скоростта, разстояния и кеш."""
 
+import fcntl
 import math
-import threading
 import time
 
 from imotko import store
+from imotko.config import DATA_DIR
 
 # Nominatim иска име на приложението; личен имейл не пращаме
 HEADERS = {"User-Agent": "imotko/0.1 (personal apartment search assistant)"}
@@ -16,19 +17,26 @@ EARTH_RADIUS_KM = 6371.0
 
 
 class RateLimiter:
-    """Не повече от една заявка за `interval` секунди, дори от няколко нишки."""
+    """Не повече от една заявка за `interval` секунди, дори от няколко нишки и процеса (агентът и watch.py).
 
-    def __init__(self, interval: float):
+    Времето на последната заявка е във файл в DATA_DIR, заключен докато се чака.
+    """
+
+    def __init__(self, interval: float, name: str):
         self.interval = interval
-        self.lock = threading.Lock()
-        self.last_request_time = 0.0
+        self.path = DATA_DIR / f".{name}.ratelimit"
 
     def wait(self) -> None:
-        with self.lock:
-            seconds_to_wait = self.last_request_time + self.interval - time.time()
+        with open(self.path, "a+") as file:
+            fcntl.flock(file, fcntl.LOCK_EX)
+            file.seek(0)
+            last_request_time = float(file.read() or 0)
+            seconds_to_wait = last_request_time + self.interval - time.time()
             if seconds_to_wait > 0:
                 time.sleep(seconds_to_wait)
-            self.last_request_time = time.time()
+            file.seek(0)
+            file.truncate()
+            file.write(str(time.time()))
 
 
 def distance_km(start: dict, end: dict) -> float:

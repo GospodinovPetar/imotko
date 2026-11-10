@@ -33,7 +33,7 @@ CALIBRATION_CACHE_SECONDS = 300
 
 OSRM_TABLE_BATCH = 50
 
-_osrm_limit = common.RateLimiter(1.0)
+_osrm_limit = common.RateLimiter(1.0, "osrm")
 
 
 class NoRoute(requests.RequestException):
