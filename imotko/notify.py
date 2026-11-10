@@ -6,7 +6,8 @@ from abc import ABC, abstractmethod
 import requests
 
 NTFY_URL = "https://ntfy.sh/"
-MAX_MESSAGE_LENGTH = 3500  # ntfy приема до 4096 байта на съобщение
+# ntfy приема до 4096 байта, иначе праща съобщението като файл; буквата на кирилица е 2 байта
+MAX_MESSAGE_LENGTH = 1800
 
 
 def split_message(text: str, max_length: int = MAX_MESSAGE_LENGTH) -> list[str]:

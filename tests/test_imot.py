@@ -279,6 +279,11 @@ class Watch(unittest.TestCase):
         self.assertTrue(all(len(part) <= 1000 for part in parts))
         self.assertEqual("".join(parts), text)
 
+    def test_parts_fit_ntfy_byte_limit(self):
+        # ntfy праща по-голямо от 4096 байта като файл, а кирилицата е 2 байта на буква
+        text = "\n".join("   до Бизнес парк София: ~24 мин с кола (по адрес)" for _ in range(300))
+        self.assertTrue(all(len(part.encode()) <= 4096 for part in notify.split_message(text)))
+
     def test_notify_sends_cyrillic_title_as_json(self):
         with mock.patch.object(notify.requests, "post") as post:
             notify.NtfyNotifier("t").notify(["Нови"])
