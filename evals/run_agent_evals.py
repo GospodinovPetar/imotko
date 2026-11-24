@@ -12,6 +12,7 @@
 """
 
 import json
+import os
 import re
 import sys
 import uuid
@@ -55,6 +56,9 @@ def check_case(case: dict) -> tuple[bool, list[str]]:
 
 
 def main() -> int:
+    if not os.getenv("OPENROUTER_API_KEY"):
+        print("✗ OPENROUTER_API_KEY липсва (в .env или като secret в GitHub Actions): въпросите не са пуснати.")
+        return 1
     cases = json.loads(CASES_FILE.read_text(encoding="utf-8"))["cases"]
     passed = 0
     for case in cases:
