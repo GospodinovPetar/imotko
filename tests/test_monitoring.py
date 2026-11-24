@@ -44,6 +44,11 @@ class Numbers(unittest.TestCase):
         tools = ["1. 550 € | 60 кв.м", "2. 630 € | 73 кв.м"]
         self.assertEqual(monitoring.unverified_numbers("за 95 € разлика", tools), ["95"])
 
+    def test_numbers_in_a_comma_list_are_known(self):
+        seller_text = "автобуси с номера 60,86, в близост автобуси 11,309,310,82"
+        self.assertEqual(monitoring.unverified_numbers("автобуси 86 и 309", [seller_text]), [])
+        self.assertEqual(monitoring.unverified_numbers("автобус 94", [seller_text]), ["94"])
+
     def test_small_numbers_are_ignored(self):
         self.assertEqual(monitoring.unverified_numbers("1. първа, 2-3 обяви, 9 мин", []), [])
 

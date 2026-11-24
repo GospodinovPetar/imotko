@@ -16,6 +16,8 @@ from imotko import store, tracing
 # "117 000", "117,000", "5.7", "5,7", "600"
 NUMBER = re.compile(r"(?<![\w.])\d{1,3}(?:[  ,]\d{3})+(?![\d])|\d+(?:[.,]\d+)?")
 URL = re.compile(r"https?://\S+")
+# "автобуси 60,86" в текста на продавача е списък, а не 60.86
+COMMA_LIST = re.compile(r"\d+(?:,\d+)+")
 
 WARNING_MARKER = "\n\n⚠ Проверка:"
 SMALL_NUMBER = 10
@@ -51,6 +53,7 @@ def unverified_numbers(answer: str, sources: list[str]) -> list[str]:
     known = set()
     for source in sources:
         known.update(numbers_in(source))
+        known.update(float(part) for group in COMMA_LIST.findall(URL.sub(" ", source)) for part in group.split(","))
 
     unverified = []
     answer = URL.sub(" ", answer)
