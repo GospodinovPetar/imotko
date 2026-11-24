@@ -113,6 +113,7 @@ class Route(TempDatabase):
         with mock.patch.object(transit, "next_weekday", return_value=WEDNESDAY):
             result = transit.route("София", point("S1"), point("S4"))
         self.assertTrue(result["ok"])
+        self.assertLessEqual(result["best_minutes"], result["minutes"])
         self.assertIn("мин", transit.describe(result))
         self.assertIn("делничен ден сутрин", transit.describe(result))
 
@@ -149,12 +150,12 @@ class TransitCheck(unittest.TestCase):
              "real_transit_minutes": 27}
 
     def test_within_tolerance(self):
-        found = {"ok": True, "minutes": 32.0, "lines": ["автобус 83"], "transfers": 0, "walk_minutes": 11, "walk_only": False}
+        found = {"ok": True, "minutes": 40.0, "best_minutes": 30.0, "lines": ["автобус 83"], "transfers": 0, "walk_minutes": 11, "walk_only": False}
         with mock.patch.object(transit, "route", return_value=found):
             self.assertTrue(checks._check_transit(self.ROUTE)["ok"])
 
     def test_too_far_or_no_data_fails(self):
-        slow = {"ok": True, "minutes": 60.0, "lines": ["автобус 83"], "transfers": 0, "walk_minutes": 11, "walk_only": False}
+        slow = {"ok": True, "minutes": 60.0, "best_minutes": 36.0, "lines": ["автобус 83"], "transfers": 0, "walk_minutes": 11, "walk_only": False}
         with mock.patch.object(transit, "route", return_value=slow):
             self.assertFalse(checks._check_transit(self.ROUTE)["ok"])
         with mock.patch.object(transit, "route", return_value={"ok": False, "reason": "изтекло"}):

@@ -511,9 +511,10 @@ def trace_back(timetable: Timetable, how_we_got_there: dict, last_stop: int) -> 
 
 
 def route(city: str, origin: dict, destination: dict) -> dict:
-    """{"ok": True, "minutes", "lines", "transfers", "walk_minutes", "walk_only"} или {"ok": False, "reason"}.
+    """{"ok": True, "minutes", "best_minutes", "lines", "transfers", "walk_minutes", "walk_only"} или {"ok": False, "reason"}.
 
-    minutes е медианата от няколко тръгвания в делничен ден сутрин, с чакането и ходенето пеша.
+    minutes е медианата от няколко тръгвания в делничен ден сутрин, с чакането и ходенето пеша;
+    best_minutes е най-бързото от тях.
     """
     try:
         timetable, reason = load_timetable(city)
@@ -529,6 +530,7 @@ def route(city: str, origin: dict, destination: dict) -> dict:
     return {
         "ok": True,
         "minutes": statistics.median(journey["minutes"] for journey in journeys),
+        "best_minutes": journeys[0]["minutes"],
         "lines": typical_journey["lines"],
         "transfers": max(0, len(typical_journey["lines"]) - 1),
         "walk_minutes": typical_journey["walk_minutes"],

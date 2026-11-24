@@ -685,7 +685,7 @@ Language models make confident mistakes. Imotko reduces them in layers, from the
 uv run python -m imotko.quality.checks
 ```
 
-- Car times must be within ±25% of reality, transit times within ±30% (the app's time includes waiting, while Google shows the best departure).
+- Car and transit times must be within ±25% of reality. For transit the check uses the fastest of the app's departures, because Google shows the best departure, while the app's own time is the median and includes waiting.
 - Districts, streets, places and addresses must still resolve to the expected place.
 - The command returns exit code 1 on a mismatch; `watch.py` runs it weekly and sends a notification if something stops matching (for example Nominatim changed its data).
 - The same file calibrates the car-time extra minutes, so adding a verified trip makes every future time more accurate.

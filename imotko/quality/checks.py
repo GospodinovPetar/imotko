@@ -10,8 +10,6 @@ from imotko import store
 from imotko.geo import driving, geocode, transit
 
 ROUTE_TOLERANCE = 0.25
-# нашето време включва чакането на спирката, а Google показва най-добрия курс
-TRANSIT_TOLERANCE = 0.30
 
 
 def run_checks() -> list[dict]:
@@ -77,8 +75,9 @@ def _check_transit(route: dict) -> dict:
 
     real_minutes = route["real_transit_minutes"]
     lines_text = " → ".join(result["lines"]) or "пеша"
-    details = f"~{result['minutes']:.0f} мин (реално {real_minutes:g}), {lines_text}"
-    ok = abs(result["minutes"] - real_minutes) <= real_minutes * TRANSIT_TOLERANCE
+    details = f"~{result['minutes']:.0f} мин, най-бързо {result['best_minutes']:.0f} (реално {real_minutes:g}), {lines_text}"
+    # Google показва най-бързия курс, затова сравняваме с нашия най-бърз, а не с медианата (тя включва чакането)
+    ok = _within(result["best_minutes"], real_minutes)
     return _result(name, ok, details)
 
 
