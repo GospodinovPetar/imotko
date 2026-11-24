@@ -11,7 +11,7 @@ check_answer се закача към агента като post_hook. Ако м
 import bisect
 import re
 
-from imotko import store
+from imotko import store, tracing
 
 # "117 000", "117,000", "5.7", "5,7", "600"
 NUMBER = re.compile(r"(?<![\w.])\d{1,3}(?:[  ,]\d{3})+(?![\d])|\d+(?:[.,]\d+)?")
@@ -149,6 +149,8 @@ def check_answer(run_output, session=None) -> None:
     """post_hook за агента. Никога не спира отговора, дори ако самата проверка се счупи."""
     try:
         suspicious = suspicious_numbers(run_output, session)
+        if isinstance(run_output.content, str):
+            tracing.score_answer("numbers-verified", not suspicious, ", ".join(suspicious) or None)
         if not suspicious:
             return
 

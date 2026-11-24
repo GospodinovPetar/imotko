@@ -7,7 +7,7 @@ from types import SimpleNamespace
 from unittest import mock
 
 import watch
-from imotko import config, store
+from imotko import config, store, tracing
 from imotko.agent import hooks, tools
 from imotko.geo import common, driving, geocode
 from imotko.quality import checks, monitoring
@@ -66,6 +66,19 @@ class CheckAnswer(TempDatabase):
         self.assertEqual(data["models"], ["fallback-model"])
         self.assertEqual(data["version"], config.VERSION)
         self.assertIn(f"от fallback-model, imotko {config.VERSION}", checks.format_feedback())
+
+    def test_answer_is_scored_in_langfuse_when_tracing_is_on(self):
+        with mock.patch.object(tracing, "_enabled", True), mock.patch.object(tracing, "get_client") as client:
+            monitoring.check_answer(fake_run("До УНСС е 35 мин.", ["~19 мин"]))
+            monitoring.check_answer(fake_run("До УНСС е ~19 мин.", ["~19 мин"]))
+        scores = [call.kwargs for call in client.return_value.score_current_trace.call_args_list]
+        self.assertEqual([(score["value"], score["comment"]) for score in scores], [(0.0, "35"), (1.0, None)])
+
+    def test_tracing_stays_off_without_keys(self):
+        with mock.patch.dict("os.environ", {"LANGFUSE_PUBLIC_KEY": "", "LANGFUSE_SECRET_KEY": ""}), \
+                mock.patch.object(tracing, "AgnoInstrumentor") as instrumentor:
+            self.assertFalse(tracing.setup("development"))
+        instrumentor.assert_not_called()
 
     def test_verified_answer_is_untouched(self):
         run = fake_run("До УНСС е ~19 мин.", ["С кола: ~19 мин, 5.7 км"])

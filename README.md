@@ -228,6 +228,7 @@ evals/                        sample questions run against the real model
 | **OSRM** | Car routing | Single routes and a batched table call for many origins to one target, then calibrated for city traffic. | `imotko/geo/driving.py` |
 | **Overpass API** | Shop data | Downloads all supermarkets of a city once a month, in a background thread, with three mirror servers. | `imotko/geo/shops.py` |
 | **GTFS + Connection Scan** | Public transport | Official municipal timetables, downloaded and routed locally. No external routing service. | `imotko/geo/transit.py` |
+| **Langfuse** | Tracing (optional) | Each answer as a trace: model calls, tool calls, tokens, timing and the `numbers-verified` score. Agno is instrumented with OpenInference over OpenTelemetry. | `imotko/tracing.py` |
 | **ntfy.sh** | Phone notifications | `NtfyNotifier` posts JSON to a topic. | `imotko/notify.py` |
 | **uv** | Environment | Python 3.14 and locked dependencies (`uv.lock`). | `pyproject.toml` |
 | **Docker + Compose** | Deployment | Multi-stage image pinned by digest, non-root user, healthcheck, log rotation. Two services: the agent and the watcher. | `Dockerfile`, `compose.yaml` |
@@ -721,6 +722,15 @@ Run them after changing the instructions or the model. A free model answering 42
 
 Tell the agent when something is wrong. `report_error` saves it and, for car times, recalibrates immediately. `python -m imotko.quality.checks` also lists the latest corrections and flagged answers.
 
+### 5. Tracing in Langfuse (optional)
+
+With Langfuse keys in `.env`, `app.py`, `chat.py` and the evals send every answer to [Langfuse](https://langfuse.com) ([`imotko/tracing.py`](imotko/tracing.py)). Without the keys nothing is sent, and the tests never send anything.
+
+- **One trace per answer:** the agent run (`Имотко.run`), then a generation for every model call, with the tool calls between them. The input is the user's question and the output is the answer.
+- **On each generation:** the model that answered, the tokens, the reasoning and the full messages. A failed call is marked `ERROR`, so a switch to the fallback model is visible.
+- **Grouping:** the user and session ids from Agno, the environment (`production` for `app.py`, `development` for `chat.py`, `evals` for the evals; `LANGFUSE_TRACING_ENVIRONMENT` overrides it) and the Imotko version as the release.
+- **Score `numbers-verified`:** the result of check 2 above (true or false, with the unverified numbers as the comment). Filter on `numbers-verified = false` to find answers with numbers that no tool returned.
+
 ### Honesty built into the output
 
 - Each measurement states its precision.
@@ -787,6 +797,8 @@ Everything is optional except the key. Set values in `.env` (a template is in [`
 | `WATCH_MIN_SCORE` | Minimum score for a new listing to be reported | `20` |
 | `NTFY_TOPIC` | ntfy.sh topic for notifications | disabled |
 | `IMOT_DATA_DIR` | Where the databases and timetables live | project root |
+| `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY` | Turn on [tracing in Langfuse](#5-tracing-in-langfuse-optional) | disabled |
+| `LANGFUSE_BASE_URL` | Langfuse region or self-hosted URL | `https://cloud.langfuse.com` |
 
 > Free models sometimes answer 429 ("overloaded"). That is what the fallbacks are for; a slow answer is not a bug.
 

@@ -20,6 +20,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from imotko import tracing  # noqa: E402
 from imotko.agent import imot_agent  # noqa: E402
 from imotko.quality import monitoring  # noqa: E402
 
@@ -59,6 +60,7 @@ def main() -> int:
     if not os.getenv("OPENROUTER_API_KEY"):
         print("✗ OPENROUTER_API_KEY липсва (в .env или като secret в GitHub Actions): въпросите не са пуснати.")
         return 1
+    tracing.setup("evals")
     cases = json.loads(CASES_FILE.read_text(encoding="utf-8"))["cases"]
     passed = 0
     for case in cases:
