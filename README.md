@@ -716,7 +716,7 @@ Cases currently cover `distance_between`, `compare_districts`, `search_apartment
 uv run python evals/run_agent_evals.py
 ```
 
-Run them after changing the instructions or the model. A free model answering 429 is reported as "the model did not answer", not as a failure.
+Run them after changing the instructions or the model. When the model does not answer (a 429, or the daily free-model limit of OpenRouter), the question is reported as "the model did not answer", not as a bad answer. The run fails only on a bad answer, or when the model answered no question at all.
 
 **Experiments in Langfuse.** [`evals/run_experiment.py`](evals/run_experiment.py) runs a Langfuse dataset (default `Imotko`) through the agent, one question at a time, and saves the result as a dataset run, so runs with different models or instructions can be compared side by side in Langfuse. It needs the Langfuse keys in `.env`.
 

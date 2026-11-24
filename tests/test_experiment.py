@@ -1,4 +1,4 @@
-"""Тестове за оценките в evals/run_experiment.py. Без мрежа и без модел."""
+"""Тестове за evals/run_experiment.py и evals/run_agent_evals.py. Без мрежа и без модел."""
 
 import asyncio
 import sys
@@ -10,6 +10,7 @@ from unittest import mock
 from agno.run.base import RunStatus
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "evals"))
+import run_agent_evals as agent_evals  # noqa: E402
 import run_experiment as experiment  # noqa: E402
 
 QUESTION = "Колко е от ул. Елин Връх до УНСС с кола?"
@@ -42,6 +43,32 @@ class Evaluators(unittest.TestCase):
         self.assertEqual(experiment.no_made_up_numbers(input="въпрос", output="отговор", metadata={}), [])
         made_up = experiment.no_made_up_numbers(input="въпрос", output="около 12 мин", metadata={"expect_no_numbers": True})
         self.assertFalse(made_up.value)
+
+
+class AgentEvals(unittest.TestCase):
+    CASE = {"question": QUESTION, "expected_tools": ["distance_between"]}
+
+    def test_model_error_counts_as_unanswered(self):
+        failed_run = SimpleNamespace(status=RunStatus.error, content="Rate limit exceeded: free-models-per-day", tools=[])
+        with mock.patch.object(agent_evals.imot_agent, "run", return_value=failed_run):
+            ok, problems = agent_evals.check_case(self.CASE)
+        self.assertIsNone(ok)
+        self.assertIn("моделът не отговори", problems[0])
+
+    def exit_code(self, results):
+        with (
+            mock.patch.dict("os.environ", {"OPENROUTER_API_KEY": "test"}),
+            mock.patch.object(agent_evals.tracing, "setup"),
+            mock.patch.object(agent_evals.json, "loads", return_value={"cases": [self.CASE] * len(results)}),
+            mock.patch.object(agent_evals, "check_case", side_effect=[(ok, []) for ok in results]),
+            mock.patch("builtins.print"),
+        ):
+            return agent_evals.main()
+
+    def test_exit_code(self):
+        self.assertEqual(self.exit_code([True, None]), 0)  # един без отговор не проваля пускането
+        self.assertEqual(self.exit_code([True, False]), 1)
+        self.assertEqual(self.exit_code([None, None]), 1)  # нищо не е проверено
 
 
 if __name__ == "__main__":

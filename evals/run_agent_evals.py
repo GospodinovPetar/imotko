@@ -2,7 +2,8 @@
 
 Пускане: uv run python evals/run_agent_evals.py
 Прави истински заявки към модела и към imot.bg (около минута на въпрос). Безплатните модели
-понякога връщат 429; тогава въпросът се отчита като "моделът не отговори", не като грешка.
+понякога връщат 429 (или дневният им лимит свършва); тогава въпросът се отчита като "моделът не отговори",
+а не като лош отговор. Код 1 при лош отговор или ако моделът не е отговорил на нито един въпрос.
 
 Проверява:
 - извикани ли са очакваните инструменти;
@@ -20,6 +21,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from agno.run.base import RunStatus  # noqa: E402
+
 from imotko import tracing  # noqa: E402
 from imotko.agent import imot_agent  # noqa: E402
 from imotko.quality import monitoring  # noqa: E402
@@ -27,11 +30,12 @@ from imotko.quality import monitoring  # noqa: E402
 CASES_FILE = Path(__file__).with_name("agent_cases.json")
 
 
-def check_case(case: dict) -> tuple[bool, list[str]]:
+def check_case(case: dict) -> tuple[bool | None, list[str]]:
+    """(True/False, проблеми), или (None, причина), ако моделът изобщо не е отговорил."""
     run = imot_agent.run(case["question"], user_id="evals", session_id=f"eval-{uuid.uuid4().hex[:8]}")
     answer = run.content if isinstance(run.content, str) else ""
-    if not answer:
-        return False, ["моделът не отговори"]
+    if run.status == RunStatus.error or not answer:
+        return None, [f"моделът не отговори: {answer[:120] or 'празен отговор'}"]
 
     problems = []
     called = [tool.tool_name for tool in (run.tools or [])]
@@ -62,16 +66,19 @@ def main() -> int:
         return 1
     tracing.setup("evals")
     cases = json.loads(CASES_FILE.read_text(encoding="utf-8"))["cases"]
-    passed = 0
+    results = []
     for case in cases:
         ok, problems = check_case(case)
-        passed += ok
-        print(f"{'✓' if ok else '✗'} {case['question']}")
+        results.append(ok)
+        print(f"{'?' if ok is None else '✓' if ok else '✗'} {case['question']}")
         for problem in problems:
             print(f" - {problem}")
 
-    print(f"\n{passed} от {len(cases)} минават.")
-    return 0 if passed == len(cases) else 1
+    answered = [ok for ok in results if ok is not None]
+    print(f"\n{sum(answered)} от {len(answered)} отговорени минават.")
+    if len(answered) < len(cases):
+        print(f"⚠ {len(cases) - len(answered)} от {len(cases)} въпроса без отговор от модела (напр. 429 или дневен лимит).")
+    return 0 if answered and all(answered) else 1
 
 
 if __name__ == "__main__":
