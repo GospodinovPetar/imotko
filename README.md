@@ -718,6 +718,14 @@ uv run python evals/run_agent_evals.py
 
 Run them after changing the instructions or the model. A free model answering 429 is reported as "the model did not answer", not as a failure.
 
+**Experiments in Langfuse.** [`evals/run_experiment.py`](evals/run_experiment.py) runs a Langfuse dataset (default `Imotko`) through the agent, one question at a time, and saves the result as a dataset run, so runs with different models or instructions can be compared side by side in Langfuse. It needs the Langfuse keys in `.env`.
+
+```bash
+uv run python evals/run_experiment.py            # or: ... run_experiment.py <dataset name>
+```
+
+Each item's `metadata` drives the scores: `tools-called` (`expected_tools`), `mentions-expected` (`must_mention_any`, `must_not_mention`), `minutes-in-range` (`minutes_range`) and `no-made-up-numbers` (`expect_no_numbers`). Every answer also gets `numbers-verified` from check 2, and the run gets `pass-rate`, the share of questions where all scores pass. Each question uses a new user id, so the agent's memory does not carry over between questions. A question the model did not answer (for example a 429 or the daily free-model limit) is marked as an error and left out of the scores, so it does not count as a bad answer.
+
 ### 4. Your corrections
 
 Tell the agent when something is wrong. `report_error` saves it and, for car times, recalibrates immediately. `python -m imotko.quality.checks` also lists the latest corrections and flagged answers.
